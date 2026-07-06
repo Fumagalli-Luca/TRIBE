@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -95,66 +96,94 @@ export default function LoginScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Bentornato su TRIBE</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            Benvenuto in{'\n'}
+            <Text style={styles.titleAccent}>TRIBE</Text>
+          </Text>
+          <Text style={styles.subtitle}>Il travel OS per gruppi di amici.</Text>
+        </View>
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={() => handleOAuth('google')}>
-          <Text style={styles.buttonSecondaryText}>Continua con Google</Text>
-        </TouchableOpacity>
+        <View style={styles.form}>
+          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('google')}>
+            <View style={[styles.oauthIcon, { backgroundColor: '#EA4335' }]}>
+              <Text style={styles.oauthIconText}>G</Text>
+            </View>
+            <Text style={styles.oauthButtonText}>Continua con Google</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={() => handleOAuth('apple')}>
-          <Text style={styles.buttonSecondaryText}>Continua con Apple</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('apple')}>
+            <View style={[styles.oauthIcon, { backgroundColor: colors.text }]}>
+              <Text style={[styles.oauthIconText, { color: colors.background }]}></Text>
+            </View>
+            <Text style={styles.oauthButtonText}>Continua con Apple</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.divider}>oppure</Text>
+          <Text style={styles.divider}>oppure</Text>
 
-        {step === 'email' ? (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="La tua email"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <TouchableOpacity style={styles.buttonPrimary} onPress={handleSendCode} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.buttonPrimaryText}>Continua con email</Text>
-              )}
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={styles.hint}>
-              Ti abbiamo inviato un codice a {email.trim()}. Inseriscilo qui sotto.
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Codice a 6 cifre"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="number-pad"
-              maxLength={6}
-              value={code}
-              onChangeText={setCode}
-            />
-            <TouchableOpacity style={styles.buttonPrimary} onPress={handleVerifyCode} disabled={loading}>
-              {loading ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.buttonPrimaryText}>Verifica codice</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setStep('email')}>
-              <Text style={styles.linkText}>Usa un'altra email</Text>
-            </TouchableOpacity>
-          </>
-        )}
+          {step === 'email' ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="La tua email"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+              <TouchableOpacity
+                style={styles.buttonPrimary}
+                onPress={handleSendCode}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.text} />
+                ) : (
+                  <Text style={styles.buttonPrimaryText}>Continua con email</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.hint}>
+                Ti abbiamo inviato un codice a {email.trim()}. Inseriscilo qui sotto.
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Codice a 6 cifre"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                maxLength={6}
+                value={code}
+                onChangeText={setCode}
+              />
+              <TouchableOpacity
+                style={styles.buttonPrimary}
+                onPress={handleVerifyCode}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.text} />
+                ) : (
+                  <Text style={styles.buttonPrimaryText}>Verifica codice</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setStep('email')}>
+                <Text style={styles.linkText}>Usa un'altra email</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+          {error && <Text style={styles.errorText}>{error}</Text>}
+        </View>
+
+        <Text style={styles.terms}>
+          Continuando accetti i{' '}
+          <Text style={styles.termsLink}>Termini di servizio</Text> e la{' '}
+          <Text style={styles.termsLink}>Privacy Policy</Text>
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -167,33 +196,64 @@ const styles = StyleSheet.create({
   },
   container: {
     flexGrow: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     padding: spacing.lg,
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.xl * 2,
+    paddingBottom: spacing.lg,
+  },
+  header: {
+    marginBottom: spacing.xl,
   },
   title: {
-    ...typography.h1,
+    ...typography.display,
     color: colors.text,
-    marginBottom: spacing.lg,
   },
-  buttonSecondary: {
+  titleAccent: {
+    color: colors.primary,
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  form: {
+    gap: spacing.md,
+  },
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.text,
     borderRadius: radius.buttonPrimary,
     height: 52,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  oauthIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonSecondaryText: {
+  oauthIconText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  oauthButtonText: {
     ...typography.body,
-    color: colors.accent,
+    color: '#111114',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 24,
   },
   divider: {
     ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    marginVertical: spacing.sm,
   },
   input: {
     borderWidth: 1,
@@ -231,5 +291,15 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.danger,
     textAlign: 'center',
+  },
+  terms: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
+  termsLink: {
+    color: colors.accent,
+    textDecorationLine: 'underline',
   },
 });
