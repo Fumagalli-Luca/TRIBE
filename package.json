@@ -9,7 +9,10 @@
     "@react-navigation/native-stack": "^7.17.7",
     "@supabase/supabase-js": "^2.110.0",
     "expo": "~54.0.35",
+    "expo-auth-session": "^57.0.1",
+    "expo-linking": "^57.0.1",
     "expo-status-bar": "~3.0.9",
+    "expo-web-browser": "^57.0.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
@@ -31,4 +34,3 @@
   },
   "private": true
 }
-
