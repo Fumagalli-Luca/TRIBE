@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -19,6 +19,27 @@ import { colors, radius, spacing, typography } from '../../constants/theme';
 type Step = 'email' | 'code';
 
 const redirectTo = makeRedirectUri({ scheme: 'tribeapp' });
+const RESEND_COOLDOWN_SECONDS = 60;
+
+function translateAuthError(message: string): string {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('rate limit')) {
+    return 'Hai richiesto troppi codici in poco tempo. Aspetta qualche minuto e riprova.';
+  }
+  if (normalized.includes('invalid') && normalized.includes('otp')) {
+    return 'Codice non valido o scaduto. Controlla di averlo copiato bene o richiedine uno nuovo.';
+  }
+  if (normalized.includes('token has expired')) {
+    return 'Il codice è scaduto. Richiedine uno nuovo.';
+  }
+  if (normalized.includes('email') && normalized.includes('invalid')) {
+    return "L'indirizzo email non sembra valido.";
+  }
+  if (normalized.includes('network')) {
+    return 'Problema di connessione. Controlla la rete e riprova.';
+  }
+  return message;
+}
 
 async function createSessionFromUrl(url: string) {
   const { queryParams } = Linking.parse(url);
@@ -34,9 +55,16 @@ export default function LoginScreen() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   async function handleSendCode() {
-    if (!email.trim()) return;
+    if (!email.trim() || cooldown > 0) return;
     setError(null);
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
@@ -45,10 +73,11 @@ export default function LoginScreen() {
     });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(translateAuthError(error.message));
       return;
     }
     setStep('code');
+    setCooldown(RESEND_COOLDOWN_SECONDS);
   }
 
   async function handleVerifyCode() {
@@ -62,7 +91,7 @@ export default function LoginScreen() {
     });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(translateAuthError(error.message));
     }
     // Se non c'è errore, il listener onAuthStateChange in RootNavigator
     // rileva la sessione e naviga automaticamente verso Home.
@@ -76,8 +105,9 @@ export default function LoginScreen() {
     });
     if (error || !data?.url) {
       setError(
-        error?.message ??
-          `Provider ${provider} non ancora configurato in Supabase (Authentication → Providers).`
+        error
+          ? translateAuthError(error.message)
+          : `Provider ${provider} non ancora configurato in Supabase (Authentication → Providers).`
       );
       return;
     }
@@ -134,14 +164,16 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
               />
               <TouchableOpacity
-                style={styles.buttonPrimary}
+                style={[styles.buttonPrimary, cooldown > 0 && styles.buttonDisabled]}
                 onPress={handleSendCode}
-                disabled={loading}
+                disabled={loading || cooldown > 0}
               >
                 {loading ? (
                   <ActivityIndicator color={colors.text} />
                 ) : (
-                  <Text style={styles.buttonPrimaryText}>Continua con email</Text>
+                  <Text style={styles.buttonPrimaryText}>
+                    {cooldown > 0 ? `Riprova tra ${cooldown}s` : 'Continua con email'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </>
@@ -172,6 +204,11 @@ export default function LoginScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setStep('email')}>
                 <Text style={styles.linkText}>Usa un'altra email</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSendCode} disabled={cooldown > 0 || loading}>
+                <Text style={[styles.linkText, cooldown > 0 && styles.linkTextDisabled]}>
+                  {cooldown > 0 ? `Rinvia codice tra ${cooldown}s` : 'Rinvia codice'}
+                </Text>
               </TouchableOpacity>
             </>
           )}
@@ -271,6 +308,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
   buttonPrimaryText: {
     ...typography.body,
     fontWeight: '600',
@@ -286,6 +326,9 @@ const styles = StyleSheet.create({
     color: colors.accent,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  linkTextDisabled: {
+    color: colors.textMuted,
   },
   errorText: {
     ...typography.caption,
