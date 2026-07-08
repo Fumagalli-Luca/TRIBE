@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -17,6 +18,14 @@ import { POPULAR_DESTINATIONS, VIBE_OPTIONS } from '../../types/tripGenerator';
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateTrip'>;
 
 type Step = 'destination' | 'dates' | 'group' | 'vibe' | 'review';
+
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function formatDateLabel(date: Date): string {
+  return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 interface ChatMessage {
   id: string;
@@ -51,8 +60,9 @@ export default function CreateTripScreen({ navigation }: Props) {
   ]);
 
   const [destination, setDestination] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [activeDatePicker, setActiveDatePicker] = useState<'start' | 'end' | null>(null);
   const [groupSize, setGroupSize] = useState(4);
   const [budgetPerPerson, setBudgetPerPerson] = useState('300');
   const [vibe, setVibe] = useState<string[]>([]);
@@ -70,11 +80,11 @@ export default function CreateTripScreen({ navigation }: Props) {
   }
 
   function confirmDates() {
-    if (!startDate.trim() || !endDate.trim()) return;
+    if (!startDate || !endDate) return;
     pushMessage({
       id: `a-dates-${Date.now()}`,
       from: 'user',
-      text: `${startDate} → ${endDate}`,
+      text: `${formatDateLabel(startDate)} → ${formatDateLabel(endDate)}`,
     });
     pushMessage({
       id: `q-group-${Date.now()}`,
@@ -117,11 +127,12 @@ export default function CreateTripScreen({ navigation }: Props) {
   }
 
   function handleGenerate() {
+    if (!startDate || !endDate) return;
     navigation.replace('AILoading', {
       payload: {
         destination,
-        start_date: startDate.trim(),
-        end_date: endDate.trim(),
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
         group_size: groupSize,
         budget_per_person: parseInt(budgetPerPerson, 10),
         currency: 'EUR',
@@ -182,21 +193,53 @@ export default function CreateTripScreen({ navigation }: Props) {
         {step === 'dates' && (
           <>
             <View style={styles.inputRow}>
-              <TextInput
-                style={[styles.textInput, styles.flexInput]}
-                placeholder="Inizio (AAAA-MM-GG)"
-                placeholderTextColor={colors.textMuted}
-                value={startDate}
-                onChangeText={setStartDate}
-              />
-              <TextInput
-                style={[styles.textInput, styles.flexInput]}
-                placeholder="Fine (AAAA-MM-GG)"
-                placeholderTextColor={colors.textMuted}
-                value={endDate}
-                onChangeText={setEndDate}
-              />
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput, styles.dateButton]}
+                onPress={() => setActiveDatePicker('start')}
+              >
+                <Text style={startDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+                  {startDate ? formatDateLabel(startDate) : 'Data inizio'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.textInput, styles.flexInput, styles.dateButton]}
+                onPress={() => setActiveDatePicker('end')}
+              >
+                <Text style={endDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+                  {endDate ? formatDateLabel(endDate) : 'Data fine'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {activeDatePicker && (
+              <DateTimePicker
+                value={(activeDatePicker === 'start' ? startDate : endDate) ?? new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                minimumDate={activeDatePicker === 'end' && startDate ? startDate : new Date()}
+                themeVariant="dark"
+                onChange={(_, selected) => {
+                  if (Platform.OS === 'android') setActiveDatePicker(null);
+                  if (!selected) return;
+                  if (activeDatePicker === 'start') {
+                    setStartDate(selected);
+                    if (endDate && endDate < selected) setEndDate(null);
+                  } else {
+                    setEndDate(selected);
+                  }
+                }}
+              />
+            )}
+
+            {Platform.OS === 'ios' && activeDatePicker && (
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => setActiveDatePicker(null)}
+              >
+                <Text style={styles.confirmButtonText}>Fatto</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.confirmButton} onPress={confirmDates}>
               <Text style={styles.confirmButtonText}>Continua</Text>
             </TouchableOpacity>
@@ -338,6 +381,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   flexInput: { flex: 1 },
+  dateButton: { justifyContent: 'center' },
+  dateButtonText: { ...typography.body, color: colors.text },
+  dateButtonPlaceholder: { ...typography.body, color: colors.textMuted },
   sendButton: {
     width: 48,
     height: 48,

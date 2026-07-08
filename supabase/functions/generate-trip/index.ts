@@ -6,6 +6,11 @@
 // - OPENAI_API_KEY -> da impostare manualmente:
 //     supabase secrets set OPENAI_API_KEY=sk-...
 //   oppure da Dashboard -> Edge Functions -> Secrets
+// - MOCK_AI -> se impostata a "true", NON chiama OpenAI (zero costi):
+//   genera un itinerario finto ma strutturalmente valido, utile per
+//   sviluppare/testare il resto dell'app senza spendere token.
+//     supabase secrets set MOCK_AI=true   (sviluppo, gratis)
+//     supabase secrets set MOCK_AI=false  (quando si vuole l'AI vera)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -81,6 +86,58 @@ function validateOutput(output: unknown): output is TripGeneratorOutput {
       })
     );
   });
+}
+
+function daysBetween(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(startDate);
+  const end = new Date(endDate);
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().split('T')[0]);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
+function generateMockTrip(input: TripGeneratorInput): TripGeneratorOutput {
+  const dates = daysBetween(input.start_date, input.end_date);
+  const primaryVibe = input.vibe[0] ?? 'mix';
+
+  const days: TripGeneratorDay[] = dates.map((date, index) => ({
+    day_number: index + 1,
+    date,
+    activities: [
+      {
+        time_slot: 'morning',
+        title: `Visita al centro di ${input.destination}`,
+        category: 'culture',
+        duration_minutes: 120,
+        estimated_cost: 15,
+        location_hint: `Centro storico, ${input.destination}`,
+      },
+      {
+        time_slot: 'afternoon',
+        title: `Attività ${primaryVibe} a ${input.destination}`,
+        category: primaryVibe,
+        duration_minutes: 150,
+        estimated_cost: 30,
+        location_hint: `Zona ${primaryVibe}, ${input.destination}`,
+      },
+      {
+        time_slot: 'evening',
+        title: `Cena di gruppo`,
+        category: 'food',
+        duration_minutes: 90,
+        estimated_cost: 25,
+        location_hint: `Ristorante centrale, ${input.destination}`,
+      },
+    ],
+  }));
+
+  return {
+    trip_summary: `[MOCK] ${dates.length} giorni a ${input.destination} per ${input.group_size} persone, vibe ${input.vibe.join('/')}. Questo itinerario è generato senza AI reale (MOCK_AI attivo) per non incorrere in costi durante lo sviluppo.`,
+    days,
+  };
 }
 
 async function callOpenAI(input: TripGeneratorInput): Promise<TripGeneratorOutput> {
@@ -189,7 +246,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const aiOutput = await callOpenAI(body);
+    const useMock = Deno.env.get('MOCK_AI') === 'true';
+    const aiOutput = useMock ? generateMockTrip(body) : await callOpenAI(body);
 
     const tripName = `${body.destination} ${new Date(body.start_date).getFullYear()}`;
 
