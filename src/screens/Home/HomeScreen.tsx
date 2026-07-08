@@ -1,8 +1,12 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 
-export default function HomeScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+
+export default function HomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.emptyState}>
@@ -10,7 +14,7 @@ export default function HomeScreen() {
         <Text style={styles.emptySubtitle}>
           Crea il tuo primo viaggio e lascia che l'AI costruisca l'itinerario per te.
         </Text>
-        <TouchableOpacity style={styles.cta}>
+        <TouchableOpacity style={styles.cta} onPress={() => navigation.navigate('CreateTrip')}>
           <Text style={styles.ctaText}>Crea il tuo primo viaggio</Text>
         </TouchableOpacity>
       </View>
