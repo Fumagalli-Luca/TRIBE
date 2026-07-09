@@ -1,14 +1,5 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -18,189 +9,98 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
 const SLIDES = [
   {
+    icon: '👥',
     title: 'Il tuo gruppo,\nun solo posto',
     subtitle: 'Chat, itinerario, budget e checklist. Tutto sincronizzato.',
   },
   {
+    icon: '✨',
     title: "L'AI crea\nl'itinerario",
     subtitle: 'Dì dove, quando e con che budget. Pensa il resto TRIBE.',
   },
   {
+    icon: '🗳️',
     title: 'Decidete\ninsieme',
     subtitle: 'Votate hotel e attività, dividete le spese senza discussioni.',
   },
 ];
 
-type Step = number | 'profile'; // 0..2 = slide, 'profile' = raccolta nome
-
 export default function OnboardingScreen({ navigation }: Props) {
-  const [step, setStep] = useState<Step>(0);
-  const [fullName, setFullName] = useState('');
+  const [slideIndex, setSlideIndex] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  function goNext() {
-    if (typeof step === 'number' && step < SLIDES.length - 1) {
-      setStep(step + 1);
-    } else {
-      setStep('profile');
-    }
-  }
-
-  async function handleSaveProfile() {
-    if (!fullName.trim()) return;
-    setError(null);
+  async function completeOnboarding() {
     setSaving(true);
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      setSaving(false);
-      setError('Sessione non valida, riprova ad accedere.');
-      return;
+    if (user) {
+      await supabase.from('users').update({ onboarding_completed: true }).eq('id', user.id);
     }
-
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ full_name: fullName.trim(), onboarding_completed: true })
-      .eq('id', user.id);
 
     setSaving(false);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }
 
-  if (step === 'profile') {
-    return (
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.profileContainer}>
-          <View>
-            <Text style={styles.profileTitle}>Come ti chiami?</Text>
-            <Text style={styles.profileSubtitle}>
-              Così il tuo gruppo saprà sempre chi sei nei viaggi.
-            </Text>
-          </View>
-
-          <View style={styles.profileForm}>
-            <TextInput
-              style={styles.input}
-              placeholder="Nome e cognome"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="words"
-              value={fullName}
-              onChangeText={setFullName}
-            />
-            <TouchableOpacity
-              style={[styles.primaryButton, !fullName.trim() && styles.buttonDisabled]}
-              onPress={handleSaveProfile}
-              disabled={saving || !fullName.trim()}
-            >
-              {saving ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Entra in TRIBE</Text>
-              )}
-            </TouchableOpacity>
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    );
+  function handleNext() {
+    if (slideIndex < SLIDES.length - 1) {
+      setSlideIndex((i) => i + 1);
+    } else {
+      completeOnboarding();
+    }
   }
 
-  const slide = SLIDES[step];
+  const slide = SLIDES[slideIndex];
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.skipButton}
-        onPress={() => setStep('profile')}
-      >
+      <TouchableOpacity style={styles.skipButton} onPress={completeOnboarding} disabled={saving}>
         <Text style={styles.skipText}>Salta</Text>
       </TouchableOpacity>
 
-      <View style={styles.slideBody}>
-        <View style={styles.illustration} />
-        <Text style={styles.slideTitle}>{slide.title}</Text>
-        <Text style={styles.slideSubtitle}>{slide.subtitle}</Text>
+      <View style={styles.slideBlock}>
+        <Text style={styles.icon}>{slide.icon}</Text>
+        <Text style={styles.title}>{slide.title}</Text>
+        <Text style={styles.subtitle}>{slide.subtitle}</Text>
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === step && styles.dotActive]}
-            />
-          ))}
-        </View>
-        <TouchableOpacity style={styles.primaryButton} onPress={goNext}>
-          <Text style={styles.primaryButtonText}>
-            {step === SLIDES.length - 1 ? 'Iniziamo' : 'Avanti'}
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.dotsRow}>
+        {SLIDES.map((_, i) => (
+          <View key={i} style={[styles.dot, i === slideIndex && styles.dotActive]} />
+        ))}
       </View>
+
+      <TouchableOpacity style={styles.primaryButton} onPress={handleNext} disabled={saving}>
+        <Text style={styles.primaryButtonText}>
+          {slideIndex < SLIDES.length - 1 ? 'Avanti' : 'Iniziamo'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
   container: {
     flex: 1,
     backgroundColor: colors.background,
     padding: spacing.lg,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
-  skipButton: { alignSelf: 'flex-end', marginTop: spacing.md },
+  skipButton: { position: 'absolute', top: spacing.xl, right: spacing.lg },
   skipText: { ...typography.body, color: colors.textMuted },
-  slideBody: {
-    flex: 1,
-    alignItems: 'center',
+  slideBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  icon: { fontSize: 64, marginBottom: spacing.md },
+  title: { ...typography.display, color: colors.text, textAlign: 'center' },
+  subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
+  dotsRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  illustration: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  slideTitle: {
-    ...typography.display,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  slideSubtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  footer: { gap: spacing.lg, paddingBottom: spacing.lg },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.border,
-  },
-  dotActive: {
-    backgroundColor: colors.primary,
-    width: 20,
-  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+  dotActive: { backgroundColor: colors.primary, width: 20 },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.buttonPrimary,
@@ -208,31 +108,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: { opacity: 0.5 },
-  primaryButtonText: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  profileContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-    padding: spacing.lg,
-    justifyContent: 'space-between',
-    paddingTop: spacing.xl * 2,
-    paddingBottom: spacing.xl,
-  },
-  profileTitle: { ...typography.display, color: colors.text },
-  profileSubtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.sm },
-  profileForm: { gap: spacing.md },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
+  primaryButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
 });

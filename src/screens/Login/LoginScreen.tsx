@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,33 +13,15 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../lib/supabase';
+import { translateAuthError } from '../../lib/authErrors';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 
-type Step = 'email' | 'code';
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 const redirectTo = makeRedirectUri({ scheme: 'tribeapp' });
-const RESEND_COOLDOWN_SECONDS = 60;
-
-function translateAuthError(message: string): string {
-  const normalized = message.toLowerCase();
-  if (normalized.includes('rate limit')) {
-    return 'Hai richiesto troppi codici in poco tempo. Aspetta qualche minuto e riprova.';
-  }
-  if (normalized.includes('invalid') && normalized.includes('otp')) {
-    return 'Codice non valido o scaduto. Controlla di averlo copiato bene o richiedine uno nuovo.';
-  }
-  if (normalized.includes('token has expired')) {
-    return 'Il codice è scaduto. Richiedine uno nuovo.';
-  }
-  if (normalized.includes('email') && normalized.includes('invalid')) {
-    return "L'indirizzo email non sembra valido.";
-  }
-  if (normalized.includes('network')) {
-    return 'Problema di connessione. Controlla la rete e riprova.';
-  }
-  return message;
-}
 
 async function createSessionFromUrl(url: string) {
   const { queryParams } = Linking.parse(url);
@@ -49,52 +31,32 @@ async function createSessionFromUrl(url: string) {
   await supabase.auth.setSession({ access_token, refresh_token });
 }
 
-export default function LoginScreen() {
-  const [step, setStep] = useState<Step>('email');
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(0);
 
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldown]);
-
-  async function handleSendCode() {
-    if (!email.trim() || cooldown > 0) return;
+  async function handleLogin() {
+    if (!email.trim() || !password) return;
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      options: { shouldCreateUser: true },
+      password,
     });
     setLoading(false);
+
     if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        await supabase.auth.resend({ type: 'signup', email: email.trim() });
+        navigation.replace('VerifyEmail', { email: email.trim(), mode: 'reconfirm' });
+        return;
+      }
       setError(translateAuthError(error.message));
       return;
     }
-    setStep('code');
-    setCooldown(RESEND_COOLDOWN_SECONDS);
-  }
-
-  async function handleVerifyCode() {
-    if (!code.trim()) return;
-    setError(null);
-    setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: code.trim(),
-      type: 'email',
-    });
-    setLoading(false);
-    if (error) {
-      setError(translateAuthError(error.message));
-    }
-    // Se non c'è errore, il listener onAuthStateChange in RootNavigator
-    // rileva la sessione e naviga automaticamente verso Home.
+    // Sessione creata: RootNavigator la rileva da solo e naviga.
   }
 
   async function handleOAuth(provider: 'google' | 'apple') {
@@ -122,13 +84,10 @@ export default function LoginScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.title}>
-            Benvenuto in{'\n'}
+            Bentornato in{'\n'}
             <Text style={styles.titleAccent}>TRIBE</Text>
           </Text>
           <Text style={styles.subtitle}>Il travel OS per gruppi di amici.</Text>
@@ -151,69 +110,38 @@ export default function LoginScreen() {
 
           <Text style={styles.divider}>oppure</Text>
 
-          {step === 'email' ? (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="La tua email"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-              <TouchableOpacity
-                style={[styles.buttonPrimary, cooldown > 0 && styles.buttonDisabled]}
-                onPress={handleSendCode}
-                disabled={loading || cooldown > 0}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.buttonPrimaryText}>
-                    {cooldown > 0 ? `Riprova tra ${cooldown}s` : 'Continua con email'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.hint}>
-                Ti abbiamo inviato un codice a {email.trim()}. Inseriscilo qui sotto.
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Codice a 6 cifre"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="number-pad"
-                maxLength={6}
-                value={code}
-                onChangeText={setCode}
-              />
-              <TouchableOpacity
-                style={styles.buttonPrimary}
-                onPress={handleVerifyCode}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.buttonPrimaryText}>Verifica codice</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setStep('email')}>
-                <Text style={styles.linkText}>Usa un'altra email</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSendCode} disabled={cooldown > 0 || loading}>
-                <Text style={[styles.linkText, cooldown > 0 && styles.linkTextDisabled]}>
-                  {cooldown > 0 ? `Rinvia codice tra ${cooldown}s` : 'Rinvia codice'}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
           {error && <Text style={styles.errorText}>{error}</Text>}
+
+          <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Text style={styles.buttonPrimaryText}>Accedi</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.replace('Register')}>
+            <Text style={styles.linkText}>Non hai un account? Registrati</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.terms}>
@@ -227,10 +155,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  flex: { flex: 1, backgroundColor: colors.background },
   container: {
     flexGrow: 1,
     justifyContent: 'space-between',
@@ -238,24 +163,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl * 2,
     paddingBottom: spacing.lg,
   },
-  header: {
-    marginBottom: spacing.xl,
-  },
-  title: {
-    ...typography.display,
-    color: colors.text,
-  },
-  titleAccent: {
-    color: colors.primary,
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-  },
-  form: {
-    gap: spacing.md,
-  },
+  header: { marginBottom: spacing.xl },
+  title: { ...typography.display, color: colors.text },
+  titleAccent: { color: colors.primary },
+  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.sm },
+  form: { gap: spacing.md },
   oauthButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,11 +186,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  oauthIconText: {
-    color: colors.text,
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  oauthIconText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   oauthButtonText: {
     ...typography.body,
     color: '#111114',
@@ -287,11 +195,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 24,
   },
-  divider: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
+  divider: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -308,41 +212,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonPrimaryText: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  hint: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  linkText: {
-    ...typography.caption,
-    color: colors.accent,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-  linkTextDisabled: {
-    color: colors.textMuted,
-  },
-  errorText: {
-    ...typography.caption,
-    color: colors.danger,
-    textAlign: 'center',
-  },
-  terms: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
-  termsLink: {
-    color: colors.accent,
-    textDecorationLine: 'underline',
-  },
+  buttonPrimaryText: { ...typography.body, fontWeight: '600', color: colors.text },
+  linkText: { ...typography.caption, color: colors.accent, textAlign: 'center' },
+  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
+  terms: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
+  termsLink: { color: colors.accent, textDecorationLine: 'underline' },
 });

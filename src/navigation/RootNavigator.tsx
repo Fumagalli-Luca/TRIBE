@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 import { colors } from '../constants/theme';
 import SplashScreen from '../screens/Splash/SplashScreen';
 import LoginScreen from '../screens/Login/LoginScreen';
+import RegisterScreen from '../screens/Register/RegisterScreen';
+import VerifyEmailScreen from '../screens/VerifyEmail/VerifyEmailScreen';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
 import CreateTripScreen from '../screens/CreateTrip/CreateTripScreen';
@@ -15,6 +17,8 @@ import type { TripGeneratorPayload } from '../types/tripGenerator';
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
+  VerifyEmail: { email: string; mode: 'signup' | 'reconfirm' };
   Onboarding: undefined;
   Home: undefined;
   CreateTrip: undefined;
@@ -89,7 +93,11 @@ export default function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator key={stackKey} screenOptions={{ headerShown: false }}>
         {!session ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+          </>
         ) : !profile?.onboarding_completed ? (
           <>
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
