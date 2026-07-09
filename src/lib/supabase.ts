@@ -2,7 +2,6 @@ import 'react-native-url-polyfill/auto';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/database';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,7 +12,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+// NOTA: il client non è tipizzato con il generic <Database> perché non
+// abbiamo ancora i tipi generati dallo schema reale (richiede
+// `npx supabase gen types typescript` con la CLI collegata al progetto).
+// Il placeholder precedente causava falsi errori TypeScript su .update().
+// I tipi di dominio in src/types/database.ts restano comunque la fonte
+// di verità per le shape usate manualmente nel codice.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
