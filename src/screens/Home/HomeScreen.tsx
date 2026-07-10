@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -19,23 +20,46 @@ function initialsFrom(name: string | undefined, email: string | undefined): stri
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState<string | undefined>();
   const [initials, setInitials] = useState('?');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const fullName = data.user?.user_metadata?.full_name as string | undefined;
-      setDisplayName(fullName?.split(' ')[0]);
-      setInitials(initialsFrom(fullName, data.user?.email));
-    });
+    loadProfile();
   }, []);
+
+  async function loadProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const fullName = user.user_metadata?.full_name as string | undefined;
+    setDisplayName(fullName?.split(' ')[0]);
+    setInitials(initialsFrom(fullName, user.email));
+
+    const { data } = await supabase
+      .from('users')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single();
+    setAvatarUrl((data as { avatar_url: string | null } | null)?.avatar_url ?? null);
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.greeting}>{displayName ? `Ciao, ${displayName} 👋` : 'Ciao 👋'}</Text>
-        <TouchableOpacity style={styles.avatar} onPress={() => supabase.auth.signOut()}>
-          <Text style={styles.avatarText}>{initials}</Text>
+        <TouchableOpacity
+          style={styles.avatar}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -62,7 +86,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
     paddingBottom: spacing.md,
   },
   greeting: {
@@ -76,6 +99,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     ...typography.body,

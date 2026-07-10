@@ -19,7 +19,8 @@ import { colors, radius, spacing, typography } from '../../constants/theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,7 +28,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   function validate(): string | null {
-    if (!fullName.trim()) return 'Inserisci il tuo nome.';
+    if (!firstName.trim()) return 'Inserisci il tuo nome.';
+    if (!lastName.trim()) return 'Inserisci il tuo cognome.';
     if (!email.trim() || !email.includes('@')) return "L'email non sembra valida.";
     if (password.length < 6) return 'La password deve avere almeno 6 caratteri.';
     if (password !== confirmPassword) return 'Le password non coincidono.';
@@ -43,11 +45,17 @@ export default function RegisterScreen({ navigation }: Props) {
     setError(null);
     setLoading(true);
 
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { full_name: fullName.trim() },
+        data: {
+          full_name: fullName,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        },
       },
     });
 
@@ -67,20 +75,34 @@ export default function RegisterScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>‹ Indietro</Text>
+        </TouchableOpacity>
+
         <View style={styles.header}>
           <Text style={styles.title}>Crea il tuo account</Text>
           <Text style={styles.subtitle}>Il travel OS per gruppi di amici.</Text>
         </View>
 
         <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Nome e cognome"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="words"
-            value={fullName}
-            onChangeText={setFullName}
-          />
+          <View style={styles.row}>
+            <TextInput
+              style={[styles.input, styles.flexInput]}
+              placeholder="Nome"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="words"
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+            <TextInput
+              style={[styles.input, styles.flexInput]}
+              placeholder="Cognome"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="words"
+              value={lastName}
+              onChangeText={setLastName}
+            />
+          </View>
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -118,9 +140,10 @@ export default function RegisterScreen({ navigation }: Props) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.replace('Login')}>
-            <Text style={styles.linkText}>Hai già un account? Accedi</Text>
-          </TouchableOpacity>
+          <Text style={styles.hint}>
+            Dopo la registrazione ti chiederemo altri dettagli (città, data di nascita, foto
+            profilo) per completare il tuo profilo.
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -133,12 +156,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.lg,
-    gap: spacing.xl,
+    gap: spacing.lg,
   },
+  backText: { ...typography.body, color: colors.accent },
   header: { gap: spacing.xs },
   title: { ...typography.display, color: colors.text },
   subtitle: { ...typography.body, color: colors.textMuted },
   form: { gap: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.md },
+  flexInput: { flex: 1 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -156,6 +182,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonPrimaryText: { ...typography.body, fontWeight: '600', color: colors.text },
-  linkText: { ...typography.caption, color: colors.accent, textAlign: 'center' },
+  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
 });

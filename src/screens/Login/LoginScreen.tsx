@@ -94,22 +94,6 @@ export default function LoginScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.form}>
-          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('google')}>
-            <View style={[styles.oauthIcon, { backgroundColor: '#EA4335' }]}>
-              <Text style={styles.oauthIconText}>G</Text>
-            </View>
-            <Text style={styles.oauthButtonText}>Continua con Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('apple')}>
-            <View style={[styles.oauthIcon, { backgroundColor: colors.text }]}>
-              <Text style={[styles.oauthIconText, { color: colors.background }]}></Text>
-            </View>
-            <Text style={styles.oauthButtonText}>Continua con Apple</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.divider}>oppure</Text>
-
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -129,6 +113,13 @@ export default function LoginScreen({ navigation }: Props) {
             onChangeText={setPassword}
           />
 
+          <TouchableOpacity
+            style={styles.forgotLink}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
+            <Text style={styles.forgotLinkText}>Password dimenticata?</Text>
+          </TouchableOpacity>
+
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
@@ -139,8 +130,27 @@ export default function LoginScreen({ navigation }: Props) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.replace('Register')}>
-            <Text style={styles.linkText}>Non hai un account? Registrati</Text>
+          <TouchableOpacity
+            style={styles.buttonOutline}
+            onPress={() => navigation.navigate('Register')}
+          >
+            <Text style={styles.buttonOutlineText}>Crea un account</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.divider}>oppure</Text>
+
+          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('google')}>
+            <View style={[styles.oauthIcon, { backgroundColor: '#EA4335' }]}>
+              <Text style={styles.oauthIconText}>G</Text>
+            </View>
+            <Text style={styles.oauthButtonText}>Continua con Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.oauthButton} onPress={() => handleOAuth('apple')}>
+            <View style={[styles.oauthIcon, { backgroundColor: colors.text }]}>
+              <Text style={[styles.oauthIconText, { color: colors.background }]}></Text>
+            </View>
+            <Text style={styles.oauthButtonText}>Continua con Apple</Text>
           </TouchableOpacity>
         </View>
 
@@ -158,16 +168,44 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   container: {
     flexGrow: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     padding: spacing.lg,
-    paddingTop: spacing.xl * 2,
-    paddingBottom: spacing.lg,
+    gap: spacing.xl,
   },
-  header: { marginBottom: spacing.xl },
+  header: { gap: spacing.xs },
   title: { ...typography.display, color: colors.text },
   titleAccent: { color: colors.primary },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.sm },
+  subtitle: { ...typography.body, color: colors.textMuted },
   form: { gap: spacing.md },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.buttonPrimary,
+    height: 52,
+    paddingHorizontal: spacing.md,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  forgotLink: { alignSelf: 'flex-end', marginTop: -spacing.xs },
+  forgotLinkText: { ...typography.caption, color: colors.accent },
+  buttonPrimary: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.buttonPrimary,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonPrimaryText: { ...typography.body, fontWeight: '600', color: colors.text },
+  buttonOutline: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radius.buttonPrimary,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonOutlineText: { ...typography.body, fontWeight: '600', color: colors.primary },
+  divider: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   oauthButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,26 +233,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 24,
   },
-  divider: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  buttonPrimary: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPrimaryText: { ...typography.body, fontWeight: '600', color: colors.text },
-  linkText: { ...typography.caption, color: colors.accent, textAlign: 'center' },
   errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
-  terms: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
+  terms: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   termsLink: { color: colors.accent, textDecorationLine: 'underline' },
 });
