@@ -89,7 +89,10 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        >
           <Text style={styles.backText}>‹ Indietro</Text>
         </TouchableOpacity>
 

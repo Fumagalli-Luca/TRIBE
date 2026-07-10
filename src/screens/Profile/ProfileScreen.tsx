@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -16,6 +17,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../lib/supabase';
+import { isBiometricAvailable } from '../../lib/biometrics';
+import { getBiometricEnabled, setBiometricEnabled } from '../../lib/biometricPreference';
+import CityAutocomplete from '../../components/CityAutocomplete';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
@@ -24,18 +28,36 @@ interface ProfileData {
   first_name: string | null;
   last_name: string | null;
   city: string | null;
+  province: string | null;
+  postal_code: string | null;
   birth_date: string | null;
   avatar_url: string | null;
   email: string;
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionCard}>{children}</View>
+    </View>
+  );
 }
 
 export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [city, setCity] = useState('');
+  const [province, setProvince] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricOn, setBiometricOn] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -44,6 +66,8 @@ export default function ProfileScreen({ navigation }: Props) {
 
   useEffect(() => {
     loadProfile();
+    isBiometricAvailable().then(setBiometricSupported);
+    getBiometricEnabled().then(setBiometricOn);
   }, []);
 
   async function loadProfile() {
@@ -59,7 +83,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
     const { data } = await supabase
       .from('users')
-      .select('first_name, last_name, city, birth_date, avatar_url, email')
+      .select('first_name, last_name, city, province, postal_code, birth_date, avatar_url, email')
       .eq('id', user.id)
       .single();
 
@@ -69,6 +93,8 @@ export default function ProfileScreen({ navigation }: Props) {
       setFirstName(p.first_name ?? '');
       setLastName(p.last_name ?? '');
       setCity(p.city ?? '');
+      setProvince(p.province ?? '');
+      setPostalCode(p.postal_code ?? '');
     }
     setLoading(false);
   }
@@ -105,7 +131,7 @@ export default function ProfileScreen({ navigation }: Props) {
       if (uploadError) throw uploadError;
 
       const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path);
-      const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`; // cache-busting
+      const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
 
       const { error: updateError } = await supabase
         .from('users')
@@ -115,8 +141,9 @@ export default function ProfileScreen({ navigation }: Props) {
       if (updateError) throw updateError;
 
       setProfile((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : prev));
-    } catch {
-      setError('Non siamo riusciti a caricare la foto. Riprova.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Errore sconosciuto';
+      setError(`Non siamo riusciti a caricare la foto (${message}).`);
     } finally {
       setUploadingAvatar(false);
     }
@@ -135,17 +162,24 @@ export default function ProfileScreen({ navigation }: Props) {
         last_name: lastName.trim() || null,
         full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
         city: city.trim() || null,
+        province: province.trim() || null,
+        postal_code: postalCode.trim() || null,
       })
       .eq('id', userId);
 
     setSaving(false);
 
     if (updateError) {
-      setError('Non siamo riusciti a salvare le modifiche.');
+      setError(`Non siamo riusciti a salvare le modifiche (${updateError.message}).`);
       return;
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleToggleBiometric(value: boolean) {
+    setBiometricOn(value);
+    await setBiometricEnabled(value);
   }
 
   async function handleSignOut() {
@@ -167,7 +201,10 @@ export default function ProfileScreen({ navigation }: Props) {
     >
       <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          >
             <Text style={styles.backText}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profilo</Text>
@@ -189,7 +226,10 @@ export default function ProfileScreen({ navigation }: Props) {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.form}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {saved && <Text style={styles.savedText}>Salvato ✓</Text>}
+
+        <Section title="Informazioni personali">
           <Text style={styles.label}>Nome</Text>
           <TextInput
             style={styles.input}
@@ -209,21 +249,40 @@ export default function ProfileScreen({ navigation }: Props) {
           />
 
           <Text style={styles.label}>Città</Text>
-          <TextInput
-            style={styles.input}
+          <CityAutocomplete
             value={city}
             onChangeText={setCity}
-            placeholder="La tua città"
-            placeholderTextColor={colors.textMuted}
+            onSelect={(selection) => {
+              setCity(selection.city);
+              setProvince(selection.province);
+              setPostalCode(selection.postalCode);
+            }}
           />
 
-          <Text style={styles.label}>Email</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputDisabledText}>{profile?.email}</Text>
+          <View style={styles.row}>
+            <View style={styles.flexInput}>
+              <Text style={styles.label}>Provincia</Text>
+              <TextInput
+                style={styles.input}
+                value={province}
+                onChangeText={setProvince}
+                autoCapitalize="characters"
+                maxLength={2}
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+            <View style={styles.flexInput}>
+              <Text style={styles.label}>CAP</Text>
+              <TextInput
+                style={styles.input}
+                value={postalCode}
+                onChangeText={setPostalCode}
+                keyboardType="number-pad"
+                maxLength={5}
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
           </View>
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          {saved && <Text style={styles.savedText}>Salvato ✓</Text>}
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
             {saving ? (
@@ -232,11 +291,31 @@ export default function ProfileScreen({ navigation }: Props) {
               <Text style={styles.saveButtonText}>Salva modifiche</Text>
             )}
           </TouchableOpacity>
+        </Section>
 
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Text style={styles.signOutText}>Esci</Text>
-          </TouchableOpacity>
-        </View>
+        <Section title="Account">
+          <Text style={styles.label}>Email</Text>
+          <View style={[styles.input, styles.inputDisabled]}>
+            <Text style={styles.inputDisabledText}>{profile?.email}</Text>
+          </View>
+        </Section>
+
+        {biometricSupported && (
+          <Section title="Sicurezza">
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Accedi con Face ID / Touch ID</Text>
+              <Switch
+                value={biometricOn}
+                onValueChange={handleToggleBiometric}
+                trackColor={{ false: colors.border, true: colors.primary }}
+              />
+            </View>
+          </Section>
+        )}
+
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <Text style={styles.signOutText}>Esci</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -250,7 +329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xl },
+  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -266,7 +345,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    marginVertical: spacing.sm,
   },
   avatarImage: { width: 96, height: 96, borderRadius: 48 },
   avatarPlaceholderText: { ...typography.display, color: colors.text },
@@ -284,8 +363,17 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
   },
   avatarEditBadgeText: { fontSize: 13, color: colors.background },
-  form: { gap: spacing.xs },
+  section: { gap: spacing.sm },
+  sectionTitle: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase' },
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
   label: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm, marginBottom: 4 },
+  row: { flexDirection: 'row', gap: spacing.md },
+  flexInput: { flex: 1 },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -293,20 +381,26 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: spacing.md,
     color: colors.text,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     justifyContent: 'center',
   },
   inputDisabled: { opacity: 0.6 },
   inputDisabledText: { ...typography.body, color: colors.textMuted },
-  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center', marginTop: spacing.sm },
-  savedText: { ...typography.caption, color: colors.success, textAlign: 'center', marginTop: spacing.sm },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchLabel: { ...typography.body, color: colors.text, flex: 1, marginRight: spacing.sm },
+  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
+  savedText: { ...typography.caption, color: colors.success, textAlign: 'center' },
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.buttonPrimary,
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   saveButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
   signOutButton: {

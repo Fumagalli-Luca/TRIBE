@@ -89,7 +89,10 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
   return (
     <View style={styles.flex}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.replace('Home')}>
+        <TouchableOpacity
+          onPress={() => navigation.replace('Home')}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        >
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <View style={styles.headerTextBlock}>

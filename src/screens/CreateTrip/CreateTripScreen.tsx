@@ -147,7 +147,10 @@ export default function CreateTripScreen({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        >
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Crea il tuo viaggio</Text>

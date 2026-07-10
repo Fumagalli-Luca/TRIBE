@@ -1,9 +1,16 @@
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { isBiometricAvailable, authenticateBiometric } from '../lib/biometrics';
+import {
+  getBiometricEnabled,
+  setBiometricEnabled,
+  hasAskedBiometric,
+  setAskedBiometric,
+} from '../lib/biometricPreference';
 import { colors } from '../constants/theme';
 import SplashScreen from '../screens/Splash/SplashScreen';
 import LoginScreen from '../screens/Login/LoginScreen';
@@ -19,10 +26,18 @@ import TripOverviewScreen from '../screens/TripOverview/TripOverviewScreen';
 import AppLockScreen from '../screens/AppLock/AppLockScreen';
 import type { TripGeneratorPayload } from '../types/tripGenerator';
 
+export interface PendingProfileData {
+  avatarUri: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  birthDate: string | null;
+}
+
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
-  VerifyEmail: { email: string; mode: 'signup' | 'reconfirm' };
+  VerifyEmail: { email: string; mode: 'signup' | 'reconfirm'; pendingProfile?: PendingProfileData };
   ForgotPassword: undefined;
   Onboarding: undefined;
   Home: undefined;
@@ -48,21 +63,34 @@ const navTheme = {
 
 type Profile = { onboarding_completed: boolean } | null;
 
+function promptEnableBiometric() {
+  Alert.alert(
+    'Accesso più veloce?',
+    'Vuoi usare Face ID / Touch ID per accedere a TRIBE la prossima volta?',
+    [
+      { text: 'No, grazie', style: 'cancel', onPress: () => setAskedBiometric() },
+      {
+        text: 'Sì, attiva',
+        onPress: async () => {
+          await setBiometricEnabled(true);
+          await setAskedBiometric();
+        },
+      },
+    ]
+  );
+}
+
 export default function RootNavigator() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  // Lucchetto biometrico: si applica solo alla sessione già persistita
-  // trovata all'avvio a freddo dell'app (non subito dopo un login manuale,
-  // dato che l'utente ha appena dimostrato la propria identità con la
-  // password). "checked" distingue "non ancora verificato" da "verificato
-  // e non serve" per evitare di mostrare la Splash all'infinito se il
-  // dispositivo non ha biometria configurata.
+  // Lucchetto biometrico: si applica solo se l'utente ha scelto di
+  // attivarlo (preferenza persistita), non semplicemente perché il
+  // dispositivo lo supporta.
   const [locked, setLocked] = useState(false);
   const [biometricChecked, setBiometricChecked] = useState(false);
-  const wasRestoredSession = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
@@ -79,29 +107,39 @@ export default function RootNavigator() {
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       setAuthLoading(false);
+
       if (data.session) {
-        wasRestoredSession.current = true;
         fetchProfile(data.session.user.id);
 
-        const available = await isBiometricAvailable();
-        if (available) {
+        const enabled = await getBiometricEnabled();
+        if (enabled) {
           setLocked(true);
           const success = await authenticateBiometric();
           if (success) setLocked(false);
         }
-        setBiometricChecked(true);
-      } else {
-        setBiometricChecked(true);
       }
+      setBiometricChecked(true);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
+
       if (newSession) {
         fetchProfile(newSession.user.id);
+
+        // Dopo un login/registrazione appena fatti (non un semplice
+        // ripristino sessione all'avvio), proponiamo Face ID una sola
+        // volta, se il dispositivo lo supporta.
+        if (event === 'SIGNED_IN') {
+          const alreadyAsked = await hasAskedBiometric();
+          if (!alreadyAsked) {
+            const available = await isBiometricAvailable();
+            if (available) promptEnableBiometric();
+            else await setAskedBiometric();
+          }
+        }
       } else {
         setProfile(null);
-        wasRestoredSession.current = false;
       }
     });
 

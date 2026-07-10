@@ -20,8 +20,48 @@ type Props = NativeStackScreenProps<RootStackParamList, 'VerifyEmail'>;
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
-export default function VerifyEmailScreen({ route, navigation }: Props) {
-  const { email, mode } = route.params;
+async function savePendingProfile(
+  userId: string,
+  pendingProfile: Props['route']['params']['pendingProfile']
+) {
+  if (!pendingProfile) return;
+
+  let avatarUrl: string | null = null;
+
+  if (pendingProfile.avatarUri) {
+    try {
+      const response = await fetch(pendingProfile.avatarUri);
+      const arrayBuffer = await response.arrayBuffer();
+      const path = `${userId}/avatar.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) {
+        console.warn('[avatar upload]', uploadError.message);
+      } else {
+        const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+      }
+    } catch (err) {
+      console.warn('[avatar upload] eccezione', err);
+    }
+  }
+
+  await supabase
+    .from('users')
+    .update({
+      city: pendingProfile.city,
+      province: pendingProfile.province,
+      postal_code: pendingProfile.postalCode,
+      birth_date: pendingProfile.birthDate,
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+    })
+    .eq('id', userId);
+}
+
+export default function VerifyEmailScreen({ route }: Props) {
+  const { email, mode, pendingProfile } = route.params;
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,16 +77,22 @@ export default function VerifyEmailScreen({ route, navigation }: Props) {
     if (!code.trim()) return;
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: code.trim(),
       type: 'signup',
     });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(translateAuthError(error.message));
       return;
     }
+
+    if (data.user && pendingProfile) {
+      await savePendingProfile(data.user.id, pendingProfile);
+    }
+
+    setLoading(false);
     // Sessione creata: RootNavigator la rileva da solo e naviga.
   }
 
