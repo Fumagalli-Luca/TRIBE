@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -191,23 +192,39 @@ export default function RegisterScreen({ navigation }: Props) {
             onChangeText={setConfirmPassword}
           />
 
-          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowDatePicker(true);
+            }}
+          >
             <Text style={birthDate ? styles.inputText : styles.inputPlaceholder}>
               {birthDate ? formatDateLabel(birthDate) : 'Data di nascita'}
             </Text>
           </TouchableOpacity>
           {showDatePicker && (
-            <DateTimePicker
-              value={birthDate ?? new Date(2000, 0, 1)}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              maximumDate={new Date()}
-              themeVariant="dark"
-              onChange={(_, selected) => {
-                if (Platform.OS === 'android') setShowDatePicker(false);
-                if (selected) setBirthDate(selected);
-              }}
-            />
+            <View style={styles.datePickerBlock}>
+              <DateTimePicker
+                value={birthDate ?? new Date(2000, 0, 1)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={new Date()}
+                themeVariant="dark"
+                onChange={(_, selected) => {
+                  if (Platform.OS === 'android') setShowDatePicker(false);
+                  if (selected) setBirthDate(selected);
+                }}
+              />
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  style={styles.datePickerConfirm}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={styles.datePickerConfirmText}>Fatto</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           <CityAutocomplete
@@ -295,6 +312,18 @@ const styles = StyleSheet.create({
   },
   inputText: { ...typography.body, color: colors.text },
   inputPlaceholder: { ...typography.body, color: colors.textMuted },
+  datePickerBlock: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+  },
+  datePickerConfirm: {
+    backgroundColor: colors.primary,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerConfirmText: { ...typography.body, fontWeight: '600', color: colors.text },
   buttonPrimary: {
     backgroundColor: colors.primary,
     borderRadius: radius.buttonPrimary,

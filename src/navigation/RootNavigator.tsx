@@ -20,6 +20,8 @@ import ForgotPasswordScreen from '../screens/ForgotPassword/ForgotPasswordScreen
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfile/EditProfileScreen';
+import SecurityScreen from '../screens/Security/SecurityScreen';
 import CreateTripScreen from '../screens/CreateTrip/CreateTripScreen';
 import AILoadingScreen from '../screens/CreateTrip/AILoadingScreen';
 import TripOverviewScreen from '../screens/TripOverview/TripOverviewScreen';
@@ -42,6 +44,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
   Profile: undefined;
+  EditProfile: undefined;
+  Security: undefined;
   CreateTrip: undefined;
   AILoading: { payload: TripGeneratorPayload };
   TripOverview: { tripId: string };
@@ -182,6 +186,8 @@ export default function RootNavigator() {
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Security" component={SecurityScreen} />
             <Stack.Screen
               name="CreateTrip"
               component={CreateTripScreen}
@@ -194,6 +200,8 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Security" component={SecurityScreen} />
             <Stack.Screen
               name="CreateTrip"
               component={CreateTripScreen}

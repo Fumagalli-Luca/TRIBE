@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -17,9 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../lib/supabase';
-import { isBiometricAvailable } from '../../lib/biometrics';
-import { getBiometricEnabled, setBiometricEnabled } from '../../lib/biometricPreference';
-import CityAutocomplete from '../../components/CityAutocomplete';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
@@ -27,20 +20,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 interface ProfileData {
   first_name: string | null;
   last_name: string | null;
-  city: string | null;
-  province: string | null;
-  postal_code: string | null;
-  birth_date: string | null;
   avatar_url: string | null;
   email: string;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function MenuRow({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCard}>{children}</View>
-    </View>
+    <TouchableOpacity style={styles.menuRow} onPress={onPress}>
+      <Text style={styles.menuRowLabel}>{label}</Text>
+      <Text style={styles.menuRowChevron}>›</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -48,27 +37,15 @@ export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
-
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [city, setCity] = useState('');
-  const [province, setProvince] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricOn, setBiometricOn] = useState(false);
-
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', loadProfile);
     loadProfile();
-    isBiometricAvailable().then(setBiometricSupported);
-    getBiometricEnabled().then(setBiometricOn);
-  }, []);
+    return unsubscribe;
+  }, [navigation]);
 
   async function loadProfile() {
     setLoading(true);
@@ -83,19 +60,11 @@ export default function ProfileScreen({ navigation }: Props) {
 
     const { data } = await supabase
       .from('users')
-      .select('first_name, last_name, city, province, postal_code, birth_date, avatar_url, email')
+      .select('first_name, last_name, avatar_url, email')
       .eq('id', user.id)
       .single();
 
-    const p = data as ProfileData | null;
-    if (p) {
-      setProfile(p);
-      setFirstName(p.first_name ?? '');
-      setLastName(p.last_name ?? '');
-      setCity(p.city ?? '');
-      setProvince(p.province ?? '');
-      setPostalCode(p.postal_code ?? '');
-    }
+    setProfile(data as ProfileData | null);
     setLoading(false);
   }
 
@@ -149,39 +118,6 @@ export default function ProfileScreen({ navigation }: Props) {
     }
   }
 
-  async function handleSave() {
-    if (!userId) return;
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({
-        first_name: firstName.trim() || null,
-        last_name: lastName.trim() || null,
-        full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-        city: city.trim() || null,
-        province: province.trim() || null,
-        postal_code: postalCode.trim() || null,
-      })
-      .eq('id', userId);
-
-    setSaving(false);
-
-    if (updateError) {
-      setError(`Non siamo riusciti a salvare le modifiche (${updateError.message}).`);
-      return;
-    }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  async function handleToggleBiometric(value: boolean) {
-    setBiometricOn(value);
-    await setBiometricEnabled(value);
-  }
-
   async function handleSignOut() {
     await supabase.auth.signOut();
   }
@@ -194,23 +130,22 @@ export default function ProfileScreen({ navigation }: Props) {
     );
   }
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.md }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          >
-            <Text style={styles.backText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profilo</Text>
-          <View style={{ width: 24 }} />
-        </View>
+  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '—';
 
+  return (
+    <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.md }]}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        >
+          <Text style={styles.backText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profilo</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.identityBlock}>
         <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickAvatar} disabled={uploadingAvatar}>
           {uploadingAvatar ? (
             <ActivityIndicator color={colors.text} />
@@ -218,134 +153,52 @@ export default function ProfileScreen({ navigation }: Props) {
             <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarPlaceholderText}>
-              {firstName ? firstName[0].toUpperCase() : '?'}
+              {profile?.first_name ? profile.first_name[0].toUpperCase() : '?'}
             </Text>
           )}
           <View style={styles.avatarEditBadge}>
             <Text style={styles.avatarEditBadgeText}>✎</Text>
           </View>
         </TouchableOpacity>
+        <Text style={styles.fullName}>{fullName}</Text>
+        <Text style={styles.email}>{profile?.email}</Text>
+      </View>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        {saved && <Text style={styles.savedText}>Salvato ✓</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
 
-        <Section title="Informazioni personali">
-          <Text style={styles.label}>Nome</Text>
-          <TextInput
-            style={styles.input}
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="Nome"
-            placeholderTextColor={colors.textMuted}
-          />
+      <View style={styles.menuGroup}>
+        <MenuRow label="Informazioni personali" onPress={() => navigation.navigate('EditProfile')} />
+        <MenuRow label="Sicurezza" onPress={() => navigation.navigate('Security')} />
+        <MenuRow label="Password" onPress={() => navigation.navigate('ForgotPassword')} />
+      </View>
 
-          <Text style={styles.label}>Cognome</Text>
-          <TextInput
-            style={styles.input}
-            value={lastName}
-            onChangeText={setLastName}
-            placeholder="Cognome"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Text style={styles.label}>Città</Text>
-          <CityAutocomplete
-            value={city}
-            onChangeText={setCity}
-            onSelect={(selection) => {
-              setCity(selection.city);
-              setProvince(selection.province);
-              setPostalCode(selection.postalCode);
-            }}
-          />
-
-          <View style={styles.row}>
-            <View style={styles.flexInput}>
-              <Text style={styles.label}>Provincia</Text>
-              <TextInput
-                style={styles.input}
-                value={province}
-                onChangeText={setProvince}
-                autoCapitalize="characters"
-                maxLength={2}
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-            <View style={styles.flexInput}>
-              <Text style={styles.label}>CAP</Text>
-              <TextInput
-                style={styles.input}
-                value={postalCode}
-                onChangeText={setPostalCode}
-                keyboardType="number-pad"
-                maxLength={5}
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.saveButtonText}>Salva modifiche</Text>
-            )}
-          </TouchableOpacity>
-        </Section>
-
-        <Section title="Account">
-          <Text style={styles.label}>Email</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputDisabledText}>{profile?.email}</Text>
-          </View>
-        </Section>
-
-        {biometricSupported && (
-          <Section title="Sicurezza">
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Accedi con Face ID / Touch ID</Text>
-              <Switch
-                value={biometricOn}
-                onValueChange={handleToggleBiometric}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-          </Section>
-        )}
-
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Esci</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Esci</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.background },
   centered: {
     flex: 1,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  container: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.lg, gap: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backText: { ...typography.h1, color: colors.text },
   headerTitle: { ...typography.h2, color: colors.text },
+  identityBlock: { alignItems: 'center', gap: spacing.xs },
   avatarWrapper: {
-    alignSelf: 'center',
     width: 96,
     height: 96,
     borderRadius: 48,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.sm,
+    marginBottom: spacing.sm,
   },
   avatarImage: { width: 96, height: 96, borderRadius: 48 },
   avatarPlaceholderText: { ...typography.display, color: colors.text },
@@ -363,51 +216,29 @@ const styles = StyleSheet.create({
     borderColor: colors.background,
   },
   avatarEditBadgeText: { fontSize: 13, color: colors.background },
-  section: { gap: spacing.sm },
-  sectionTitle: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase' },
-  sectionCard: {
+  fullName: { ...typography.h2, color: colors.text },
+  email: { ...typography.caption, color: colors.textMuted },
+  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
+  menuGroup: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
-    padding: spacing.md,
-    gap: spacing.xs,
+    overflow: 'hidden',
   },
-  label: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm, marginBottom: 4 },
-  row: { flexDirection: 'row', gap: spacing.md },
-  flexInput: { flex: 1 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-  },
-  inputDisabled: { opacity: 0.6 },
-  inputDisabledText: { ...typography.body, color: colors.textMuted },
-  switchRow: {
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    height: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  switchLabel: { ...typography.body, color: colors.text, flex: 1, marginRight: spacing.sm },
-  errorText: { ...typography.caption, color: colors.danger, textAlign: 'center' },
-  savedText: { ...typography.caption, color: colors.success, textAlign: 'center' },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  saveButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
+  menuRowLabel: { ...typography.body, color: colors.text },
+  menuRowChevron: { ...typography.h2, color: colors.textMuted },
   signOutButton: {
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
   },
-  signOutText: { ...typography.body, color: colors.danger },
+  signOutText: { ...typography.body, color: colors.danger, fontWeight: '600' },
 });
