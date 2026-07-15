@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../constants/theme';
 
 // Dataset pubblico gratuito dei comuni italiani (nome, provincia, CAP).
@@ -107,18 +107,17 @@ export default function CityAutocomplete({ value, onChangeText, onSelect, placeh
       )}
       {showList && suggestions.length > 0 && (
         <View style={styles.dropdown}>
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item) => item.nome}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.suggestionRow} onPress={() => handleSelect(item)}>
-                <Text style={styles.suggestionText}>
-                  {item.nome} <Text style={styles.suggestionMeta}>({item.sigla})</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
+          {suggestions.map((item) => (
+            <TouchableOpacity
+              key={item.nome}
+              style={styles.suggestionRow}
+              onPress={() => handleSelect(item)}
+            >
+              <Text style={styles.suggestionText}>
+                {item.nome} <Text style={styles.suggestionMeta}>({item.sigla})</Text>
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </View>
