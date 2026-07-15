@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -73,9 +81,34 @@ export default function AILoadingScreen({ route, navigation }: Props) {
     generateTrip();
   }
 
+  const pulse = useSharedValue(1);
+  const glowOpacity = useSharedValue(0.85);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1
+    );
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.85, { duration: 700, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1
+    );
+  }, []);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+    opacity: glowOpacity.value,
+  }));
+
   return (
     <View style={styles.container}>
-      <View style={styles.pulseCircle} />
+      <Animated.View style={[styles.pulseCircle, pulseStyle]} />
       {status === 'loading' ? (
         <Text style={styles.text}>{ROTATING_MESSAGES[messageIndex]}</Text>
       ) : (
