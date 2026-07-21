@@ -101,7 +101,12 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
             {trip.start_date} — {trip.end_date}
           </Text>
         </View>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Group', { tripId })}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        >
+          <Text style={styles.groupLink}>Gruppo</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -163,6 +168,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   backText: { ...typography.h1, color: colors.text },
+  groupLink: { ...typography.caption, color: colors.accent, fontWeight: '600' },
   headerTextBlock: { alignItems: 'center' },
   tripName: { ...typography.h2, color: colors.text },
   tripDates: { ...typography.caption, color: colors.textMuted },
