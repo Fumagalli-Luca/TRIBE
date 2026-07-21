@@ -18,6 +18,8 @@ import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../lib/supabase';
 import { translateAuthError } from '../../lib/authErrors';
 import { colors, radius, spacing, typography } from '../../constants/theme';
+import AnimatedBackground from '../../components/AnimatedBackground';
+import PressableScale from '../../components/PressableScale';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -80,7 +82,9 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
+    <View style={styles.flex}>
+      <AnimatedBackground />
+      <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
@@ -122,13 +126,13 @@ export default function LoginScreen({ navigation }: Props) {
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
+          <PressableScale style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
             {loading ? (
               <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.buttonPrimaryText}>Accedi</Text>
             )}
-          </TouchableOpacity>
+          </PressableScale>
 
           <TouchableOpacity
             style={styles.buttonOutline}
@@ -160,7 +164,8 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.termsLink}>Privacy Policy</Text>
         </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 

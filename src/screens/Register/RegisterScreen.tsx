@@ -19,6 +19,8 @@ import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../lib/supabase';
 import { translateAuthError } from '../../lib/authErrors';
 import CityAutocomplete from '../../components/CityAutocomplete';
+import AnimatedBackground from '../../components/AnimatedBackground';
+import PressableScale from '../../components/PressableScale';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
@@ -119,7 +121,9 @@ export default function RegisterScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
+    <View style={styles.flex}>
+      <AnimatedBackground />
+      <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
@@ -261,16 +265,17 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <TouchableOpacity style={styles.buttonPrimary} onPress={handleRegister} disabled={loading}>
+          <PressableScale style={styles.buttonPrimary} onPress={handleRegister} disabled={loading}>
             {loading ? (
               <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.buttonPrimaryText}>Crea account</Text>
             )}
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
