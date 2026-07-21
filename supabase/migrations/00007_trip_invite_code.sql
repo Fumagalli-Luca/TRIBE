@@ -60,3 +60,18 @@ stable
 as $$
   select id, name, destination from trips where invite_code = upper(p_code);
 $$;
+
+-- Backfill: assegna un codice ai viaggi creati prima di questa migration
+do $$
+declare
+  r record;
+  code text;
+begin
+  for r in select id from trips where invite_code is null loop
+    loop
+      code := public.generate_invite_code();
+      exit when not exists (select 1 from trips where invite_code = code);
+    end loop;
+    update trips set invite_code = code where id = r.id;
+  end loop;
+end $$;
