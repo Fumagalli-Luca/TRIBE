@@ -1,5 +1,4 @@
 import { StyleSheet, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -58,7 +57,7 @@ function FloatingBlob({
           height: size,
           borderRadius: size / 2,
           backgroundColor: color,
-          opacity: 0.35,
+          opacity: 0.2,
         },
         style,
       ]}
@@ -87,7 +86,7 @@ export default function AnimatedBackground() {
         rangeY={-35}
         duration={7000}
       />
-      <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={styles.overlay} pointerEvents="none" />
     </View>
   );
 }
@@ -97,5 +96,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
     backgroundColor: colors.background,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.background,
+    opacity: 0.55,
   },
 });
