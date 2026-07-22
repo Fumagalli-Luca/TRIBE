@@ -4,19 +4,30 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
-import type { Trip, ItineraryActivity, ItineraryDay } from '../../types/database';
+import type { Trip } from '../../types/database';
+import ItinerarioTab from './tabs/ItinerarioTab';
+import BudgetTab from './tabs/BudgetTab';
+import GroupTab from './tabs/GroupTab';
+import ChatTab from './tabs/ChatTab';
+import ChecklistTab from './tabs/ChecklistTab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TripOverview'>;
 
-interface ActivityWithDay extends ItineraryActivity {
-  day_number: number;
-}
+type TabKey = 'itinerario' | 'budget' | 'gruppo' | 'chat' | 'checklist';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'itinerario', label: 'Itinerario' },
+  { key: 'budget', label: 'Budget' },
+  { key: 'gruppo', label: 'Gruppo' },
+  { key: 'chat', label: 'Chat' },
+  { key: 'checklist', label: 'Checklist' },
+];
 
 export default function TripOverviewScreen({ route, navigation }: Props) {
   const { tripId } = route.params;
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [activities, setActivities] = useState<ActivityWithDay[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('itinerario');
 
   useEffect(() => {
     loadTrip();
@@ -24,41 +35,8 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   async function loadTrip() {
     setLoading(true);
-
-    const { data: tripData } = await supabase
-      .from('trips')
-      .select('*')
-      .eq('id', tripId)
-      .single();
-    setTrip(tripData as Trip | null);
-
-    const { data: days } = await supabase
-      .from('itinerary_days')
-      .select('id, day_number')
-      .eq('trip_id', tripId)
-      .order('day_number', { ascending: true });
-
-    if (days && days.length > 0) {
-      const dayIds = (days as Pick<ItineraryDay, 'id' | 'day_number'>[]).map((d) => d.id);
-      const dayNumberById = new Map(
-        (days as Pick<ItineraryDay, 'id' | 'day_number'>[]).map((d) => [d.id, d.day_number])
-      );
-
-      const { data: acts } = await supabase
-        .from('itinerary_activities')
-        .select('*')
-        .in('itinerary_day_id', dayIds)
-        .order('order_index', { ascending: true });
-
-      if (acts) {
-        const withDay = (acts as ItineraryActivity[]).map((a) => ({
-          ...a,
-          day_number: dayNumberById.get(a.itinerary_day_id) ?? 0,
-        }));
-        setActivities(withDay);
-      }
-    }
-
+    const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
+    setTrip(data as Trip | null);
     setLoading(false);
   }
 
@@ -101,49 +79,48 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
             {trip.start_date} — {trip.end_date}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Group', { tripId })}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-        >
-          <Text style={styles.groupLink}>Gruppo</Text>
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{daysRemaining}</Text>
-            <Text style={styles.statLabel}>giorni</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>
-              {trip.budget_per_person ?? '–'}
-              {trip.currency === 'EUR' ? '€' : ''}
-            </Text>
-            <Text style={styles.statLabel}>a testa</Text>
-          </View>
+      <View style={styles.statsRow}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{daysRemaining}</Text>
+          <Text style={styles.statLabel}>giorni</Text>
         </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>
+            {trip.budget_per_person ?? '–'}
+            {trip.currency === 'EUR' ? '€' : ''}
+          </Text>
+          <Text style={styles.statLabel}>a testa</Text>
+        </View>
+      </View>
 
-        <Text style={styles.sectionTitle}>Itinerario</Text>
-        {activities.length === 0 ? (
-          <Text style={styles.emptyText}>Nessuna attività generata.</Text>
-        ) : (
-          activities.map((a) => (
-            <View key={a.id} style={styles.activityCard}>
-              <View style={styles.activityDayBadge}>
-                <Text style={styles.activityDayBadgeText}>Day {a.day_number}</Text>
-              </View>
-              <View style={styles.activityInfo}>
-                <Text style={styles.activityTitle}>{a.title}</Text>
-                <Text style={styles.activityMeta}>
-                  {a.time_slot} · {a.duration_minutes} min
-                  {a.location_name ? ` · ${a.location_name}` : ''}
-                </Text>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
+      <View style={styles.tabBar}>
+        {TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={styles.tabItem}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+              {tab.label}
+            </Text>
+            {activeTab === tab.key && <View style={styles.tabIndicator} />}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {activeTab === 'chat' ? (
+        <ChatTab tripId={tripId} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {activeTab === 'itinerario' && <ItinerarioTab tripId={tripId} />}
+          {activeTab === 'budget' && <BudgetTab tripId={tripId} />}
+          {activeTab === 'gruppo' && <GroupTab tripId={tripId} />}
+          {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -168,12 +145,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   backText: { ...typography.h1, color: colors.text },
-  groupLink: { ...typography.caption, color: colors.accent, fontWeight: '600' },
   headerTextBlock: { alignItems: 'center' },
   tripName: { ...typography.h2, color: colors.text },
   tripDates: { ...typography.caption, color: colors.textMuted },
-  content: { padding: spacing.md, gap: spacing.md },
-  statsRow: { flexDirection: 'row', gap: spacing.md },
+  statsRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.md },
   statBox: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -183,24 +158,21 @@ const styles = StyleSheet.create({
   },
   statValue: { ...typography.monoLg, color: colors.text },
   statLabel: { ...typography.caption, color: colors.textMuted },
-  sectionTitle: { ...typography.h2, color: colors.text, marginTop: spacing.sm },
-  emptyText: { ...typography.body, color: colors.textMuted },
-  activityCard: {
+  tabBar: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    padding: spacing.md,
-    gap: spacing.md,
-    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
-  activityDayBadge: {
-    backgroundColor: colors.background,
-    borderRadius: radius.chip,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.xs },
+  tabLabel: { ...typography.caption, color: colors.textMuted, fontWeight: '600' },
+  tabLabelActive: { color: colors.accent },
+  tabIndicator: {
+    height: 2,
+    width: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 1,
   },
-  activityDayBadgeText: { ...typography.caption, color: colors.accent, fontWeight: '600' },
-  activityInfo: { flex: 1 },
-  activityTitle: { ...typography.body, color: colors.text, fontWeight: '600' },
-  activityMeta: { ...typography.caption, color: colors.textMuted },
+  content: { padding: spacing.md, paddingBottom: spacing.xl },
 });

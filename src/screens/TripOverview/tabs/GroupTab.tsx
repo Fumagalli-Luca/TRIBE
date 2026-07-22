@@ -1,20 +1,11 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../navigation/RootNavigator';
-import { supabase } from '../../lib/supabase';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { ActivityIndicator, Image, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { colors, radius, spacing, typography } from '../../../constants/theme';
+import { supabase } from '../../../lib/supabase';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Group'>;
+interface Props {
+  tripId: string;
+}
 
 interface Member {
   id: string;
@@ -34,18 +25,16 @@ function initials(name: string | null): string {
     : parts[0].slice(0, 2).toUpperCase();
 }
 
-export default function GroupScreen({ route, navigation }: Props) {
-  const { tripId } = route.params;
-  const insets = useSafeAreaInsets();
+export default function GroupTab({ tripId }: Props) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadGroup();
+    load();
   }, [tripId]);
 
-  async function loadGroup() {
+  async function load() {
     setLoading(true);
 
     const { data: trip } = await supabase
@@ -74,24 +63,13 @@ export default function GroupScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={colors.primary} size="large" />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gruppo</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
+    <View style={styles.container}>
       <View style={styles.inviteCard}>
         <Text style={styles.inviteLabel}>Codice invito</Text>
         <Text style={styles.inviteCode}>{inviteCode ?? '——————'}</Text>
@@ -100,9 +78,7 @@ export default function GroupScreen({ route, navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>
-        Membri ({members.length})
-      </Text>
+      <Text style={styles.sectionTitle}>Membri ({members.length})</Text>
 
       {members.map((member) => (
         <View key={member.id} style={styles.memberRow}>
@@ -117,6 +93,7 @@ export default function GroupScreen({ route, navigation }: Props) {
             <Text style={styles.memberName}>{member.user?.full_name ?? 'Utente'}</Text>
             <Text style={styles.memberRole}>
               {member.role === 'admin' ? 'Admin' : 'Membro'}
+              {member.status === 'pending' ? ' · in attesa' : ''}
             </Text>
           </View>
         </View>
@@ -126,16 +103,8 @@ export default function GroupScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, gap: spacing.lg },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  backText: { ...typography.h1, color: colors.text },
-  headerTitle: { ...typography.h2, color: colors.text },
+  centered: { paddingVertical: spacing.xl, alignItems: 'center' },
+  container: { gap: spacing.lg },
   inviteCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -144,12 +113,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   inviteLabel: { ...typography.caption, color: colors.textMuted },
-  inviteCode: {
-    ...typography.monoLg,
-    color: colors.accent,
-    letterSpacing: 6,
-    fontSize: 28,
-  },
+  inviteCode: { ...typography.monoLg, color: colors.accent, letterSpacing: 6, fontSize: 28 },
   shareButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.buttonPrimary,

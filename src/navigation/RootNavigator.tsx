@@ -26,7 +26,6 @@ import CreateTripScreen from '../screens/CreateTrip/CreateTripScreen';
 import AILoadingScreen from '../screens/CreateTrip/AILoadingScreen';
 import TripOverviewScreen from '../screens/TripOverview/TripOverviewScreen';
 import JoinTripScreen from '../screens/JoinTrip/JoinTripScreen';
-import GroupScreen from '../screens/Group/GroupScreen';
 import AppLockScreen from '../screens/AppLock/AppLockScreen';
 import type { TripGeneratorPayload } from '../types/tripGenerator';
 
@@ -52,7 +51,6 @@ export type RootStackParamList = {
   AILoading: { payload: TripGeneratorPayload };
   TripOverview: { tripId: string };
   JoinTrip: undefined;
-  Group: { tripId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -201,7 +199,6 @@ export default function RootNavigator() {
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
-            <Stack.Screen name="Group" component={GroupScreen} />
           </>
         ) : (
           <>
@@ -218,7 +215,6 @@ export default function RootNavigator() {
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
-            <Stack.Screen name="Group" component={GroupScreen} />
           </>
         )}
       </Stack.Navigator>
