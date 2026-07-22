@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HomeNavigationProp } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
@@ -68,6 +69,7 @@ async function fetchPendingVotes(): Promise<PendingVote[]> {
 }
 
 export default function NotificationsTab({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [votes, setVotes] = useState<PendingVote[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,7 +88,7 @@ export default function NotificationsTab({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.title}>Notifiche</Text>
       </View>
 

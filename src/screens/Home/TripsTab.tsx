@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HomeNavigationProp } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +18,7 @@ interface TripSummary {
 }
 
 export default function TripsTab({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export default function TripsTab({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.title}>I tuoi viaggi</Text>
       </View>
 

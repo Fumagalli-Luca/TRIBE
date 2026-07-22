@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -30,6 +31,7 @@ interface Member {
 }
 
 export default function TripOverviewScreen({ route, navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const { tripId } = route.params;
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -100,7 +102,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity
           onPress={() => navigation.replace('Home')}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}

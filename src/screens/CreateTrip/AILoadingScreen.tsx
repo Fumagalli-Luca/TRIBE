@@ -23,12 +23,32 @@ const ROTATING_MESSAGES = [
 ];
 
 const ROTATE_INTERVAL_MS = 1800;
-const TIMEOUT_MS = 12000;
+const TIMEOUT_MS = 20000;
+
+async function extractErrorMessage(error: unknown, data: unknown): Promise<string> {
+  // La Edge Function risponde con { error: "..." } anche sui codici di
+  // errore (400/401/500): supabase-js lo espone come corpo della Response
+  // dentro error.context, non come messaggio diretto — va letto a parte.
+  const withContext = error as { context?: Response; message?: string } | null;
+  if (withContext?.context) {
+    try {
+      const body = await withContext.context.clone().json();
+      if (body?.error) return body.error as string;
+    } catch {
+      // corpo non JSON, ignora e usa il fallback sotto
+    }
+  }
+  if (withContext?.message) return withContext.message;
+  const dataError = (data as { error?: string } | null)?.error;
+  if (dataError) return dataError;
+  return 'Errore sconosciuto dalla Edge Function generate-trip.';
+}
 
 export default function AILoadingScreen({ route, navigation }: Props) {
   const { payload } = route.params;
   const [messageIndex, setMessageIndex] = useState(0);
-  const [status, setStatus] = useState<'loading' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'error' | 'timeout'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -46,6 +66,7 @@ export default function AILoadingScreen({ route, navigation }: Props) {
 
   async function generateTrip() {
     setStatus('loading');
+    setErrorMessage(null);
     startedRef.current = true;
 
     const timeoutPromise = new Promise<'timeout'>((resolve) =>
@@ -60,18 +81,20 @@ export default function AILoadingScreen({ route, navigation }: Props) {
       const result = await Promise.race([invokePromise, timeoutPromise]);
 
       if (result === 'timeout') {
-        setStatus('error');
+        setStatus('timeout');
         return;
       }
 
       const { data, error } = result;
       if (error || !data?.trip_id) {
+        setErrorMessage(await extractErrorMessage(error, data));
         setStatus('error');
         return;
       }
 
       navigation.replace('TripOverview', { tripId: data.trip_id });
-    } catch {
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Errore sconosciuto');
       setStatus('error');
     }
   }
@@ -113,7 +136,10 @@ export default function AILoadingScreen({ route, navigation }: Props) {
         <Text style={styles.text}>{ROTATING_MESSAGES[messageIndex]}</Text>
       ) : (
         <>
-          <Text style={styles.text}>Ci sta mettendo più del previsto...</Text>
+          <Text style={styles.text}>
+            {status === 'timeout' ? 'Ci sta mettendo più del previsto...' : 'Non siamo riusciti a generare il viaggio.'}
+          </Text>
+          {errorMessage && <Text style={styles.errorDetail}>{errorMessage}</Text>}
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>Riprova</Text>
           </TouchableOpacity>
@@ -146,6 +172,11 @@ const styles = StyleSheet.create({
   text: {
     ...typography.body,
     color: colors.textMuted,
+    textAlign: 'center',
+  },
+  errorDetail: {
+    ...typography.caption,
+    color: colors.danger,
     textAlign: 'center',
   },
   retryButton: {

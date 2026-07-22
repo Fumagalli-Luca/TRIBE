@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bell } from 'lucide-react-native';
 import type { HomeNavigationProp } from '../../navigation/RootNavigator';
@@ -70,6 +71,7 @@ function CountdownBox({ value, label }: { value: number; label: string }) {
 }
 
 export default function DashboardTab({ navigation, onOpenNotifications, onOpenProfile }: Props) {
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState<string | undefined>();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [trips, setTrips] = useState<TripSummary[]>([]);
@@ -151,7 +153,7 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Text style={styles.greeting}>{displayName ? `Ciao, ${displayName} 👋` : 'Ciao 👋'}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={onOpenNotifications} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
