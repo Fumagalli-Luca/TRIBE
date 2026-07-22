@@ -33,7 +33,11 @@ function MenuRow({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-export default function ProfileScreen({ navigation }: Props) {
+interface ExtraProps {
+  onBack?: () => void;
+}
+
+export default function ProfileScreen({ navigation, onBack }: Props & ExtraProps) {
   const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -135,12 +139,13 @@ export default function ProfileScreen({ navigation }: Props) {
   return (
     <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + spacing.md }]}>
       <View style={styles.headerRow}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </TouchableOpacity>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}>
+            <Text style={styles.backText}>‹</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
         <Text style={styles.headerTitle}>Profilo</Text>
         <View style={{ width: 24 }} />
       </View>

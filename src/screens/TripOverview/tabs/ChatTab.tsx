@@ -10,12 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import type { ChatMessage } from '../../../types/database';
 
 interface Props {
   tripId: string;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'TripOverview'>;
 }
 
 function formatTime(iso: string): string {
@@ -23,7 +26,7 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function ChatTab({ tripId }: Props) {
+export default function ChatTab({ tripId, navigation }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -102,10 +105,19 @@ export default function ChatTab({ tripId }: Props) {
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) =>
-          item.type === 'system' ? (
+        renderItem={({ item }) => {
+          const voteId = (item.metadata as { vote_id?: string } | null)?.vote_id;
+          return item.type === 'system' ? (
             <View style={styles.systemBubble}>
               <Text style={styles.systemText}>{item.content}</Text>
+              {voteId && (
+                <TouchableOpacity
+                  style={styles.voteButton}
+                  onPress={() => navigation.navigate('Voting', { tripId, voteId })}
+                >
+                  <Text style={styles.voteButtonText}>VOTA ORA</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View
@@ -117,8 +129,8 @@ export default function ChatTab({ tripId }: Props) {
               <Text style={styles.messageText}>{item.content}</Text>
               <Text style={styles.messageTime}>{formatTime(item.created_at)}</Text>
             </View>
-          )
-        }
+          );
+        }}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessun messaggio ancora.</Text>}
       />
 
@@ -159,6 +171,15 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs,
   },
   systemText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  voteButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
+    alignSelf: 'center',
+  },
+  voteButtonText: { ...typography.caption, color: colors.text, fontWeight: '700' },
   messageBubble: {
     maxWidth: '80%',
     borderRadius: radius.card,

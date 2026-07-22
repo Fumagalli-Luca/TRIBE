@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
+import Chip from '../../../components/Chip';
+import GradientButton from '../../../components/GradientButton';
 import type { ChecklistCategory, ChecklistItem } from '../../../types/database';
 
 interface Props {
@@ -31,6 +33,7 @@ export default function ChecklistTab({ tripId }: Props) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ChecklistCategory>('other');
   const [scope, setScope] = useState<'shared' | 'personal'>('shared');
+  const [scopeFilter, setScopeFilter] = useState<'shared' | 'personal'>('shared');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -95,10 +98,17 @@ export default function ChecklistTab({ tripId }: Props) {
     );
   }
 
+  const scopedItems = items.filter((i) => i.scope === scopeFilter);
+
   return (
     <View style={styles.container}>
+      <View style={styles.scopeRow}>
+        <Chip label="Condivisa" selected={scopeFilter === 'shared'} onPress={() => setScopeFilter('shared')} />
+        <Chip label="Personale" selected={scopeFilter === 'personal'} onPress={() => setScopeFilter('personal')} />
+      </View>
+
       {CATEGORIES.map((cat) => {
-        const catItems = items.filter((i) => i.category === cat.key);
+        const catItems = scopedItems.filter((i) => i.category === cat.key);
         if (catItems.length === 0) return null;
         const doneCount = catItems.filter((i) => i.is_done).length;
 
@@ -133,18 +143,15 @@ export default function ChecklistTab({ tripId }: Props) {
                 <Text style={[styles.itemText, item.is_done && styles.itemTextDone]}>
                   {item.title}
                 </Text>
-                {item.scope === 'personal' && <Text style={styles.itemBadge}>personale</Text>}
               </TouchableOpacity>
             ))}
           </View>
         );
       })}
 
-      {items.length === 0 && <Text style={styles.emptyText}>Nessun elemento in checklist.</Text>}
+      {scopedItems.length === 0 && <Text style={styles.emptyText}>Nessun elemento qui.</Text>}
 
-      <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
-        <Text style={styles.addButtonText}>+ Aggiungi</Text>
-      </TouchableOpacity>
+      <GradientButton label="+ Aggiungi item" onPress={() => setModalVisible(true)} />
 
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -212,6 +219,7 @@ export default function ChecklistTab({ tripId }: Props) {
 const styles = StyleSheet.create({
   centered: { paddingVertical: spacing.xl, alignItems: 'center' },
   container: { gap: spacing.lg },
+  scopeRow: { flexDirection: 'row', gap: spacing.sm },
   emptyText: { ...typography.body, color: colors.textMuted },
   categorySection: { gap: spacing.sm },
   categoryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -245,22 +253,6 @@ const styles = StyleSheet.create({
   checkboxMark: { color: colors.text, fontSize: 14, fontWeight: '700' },
   itemText: { ...typography.body, color: colors.text, flex: 1 },
   itemTextDone: { color: colors.textMuted, textDecorationLine: 'line-through' },
-  itemBadge: {
-    ...typography.caption,
-    color: colors.accent,
-    backgroundColor: colors.background,
-    borderRadius: radius.chip,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

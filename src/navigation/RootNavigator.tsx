@@ -1,5 +1,5 @@
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
@@ -19,13 +19,13 @@ import VerifyEmailScreen from '../screens/VerifyEmail/VerifyEmailScreen';
 import ForgotPasswordScreen from '../screens/ForgotPassword/ForgotPasswordScreen';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import HomeScreen from '../screens/Home/HomeScreen';
-import ProfileScreen from '../screens/Profile/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfile/EditProfileScreen';
 import SecurityScreen from '../screens/Security/SecurityScreen';
 import CreateTripScreen from '../screens/CreateTrip/CreateTripScreen';
 import AILoadingScreen from '../screens/CreateTrip/AILoadingScreen';
 import TripOverviewScreen from '../screens/TripOverview/TripOverviewScreen';
 import JoinTripScreen from '../screens/JoinTrip/JoinTripScreen';
+import VotingScreen from '../screens/Voting/VotingScreen';
 import AppLockScreen from '../screens/AppLock/AppLockScreen';
 import type { TripGeneratorPayload } from '../types/tripGenerator';
 
@@ -51,9 +51,13 @@ export type RootStackParamList = {
   AILoading: { payload: TripGeneratorPayload };
   TripOverview: { tripId: string };
   JoinTrip: undefined;
+  Voting: { tripId: string; voteId?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/** Navigation prop condiviso dai tab embedded nella Home (§4.4 bottom nav). */
+export type HomeNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 const navTheme = {
   ...DarkTheme,
@@ -188,7 +192,6 @@ export default function RootNavigator() {
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Security" component={SecurityScreen} />
             <Stack.Screen
@@ -199,12 +202,12 @@ export default function RootNavigator() {
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
+            <Stack.Screen name="Voting" component={VotingScreen} />
           </>
         ) : (
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Security" component={SecurityScreen} />
             <Stack.Screen
@@ -215,6 +218,7 @@ export default function RootNavigator() {
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
+            <Stack.Screen name="Voting" component={VotingScreen} />
           </>
         )}
       </Stack.Navigator>

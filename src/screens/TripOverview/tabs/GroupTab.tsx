@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
+import Avatar from '../../../components/Avatar';
+import GradientButton from '../../../components/GradientButton';
 
 interface Props {
   tripId: string;
@@ -9,6 +12,7 @@ interface Props {
 
 interface Member {
   id: string;
+  user_id: string;
   role: string;
   status: string;
   user: {
@@ -17,17 +21,17 @@ interface Member {
   } | null;
 }
 
-function initials(name: string | null): string {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  return parts.length > 1
-    ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    : parts[0].slice(0, 2).toUpperCase();
+function formatAmount(n: number, currency: string): string {
+  const symbol = currency === 'EUR' ? '€' : currency;
+  const sign = n > 0 ? '+' : n < 0 ? '-' : '';
+  return `${sign}${Math.abs(n).toFixed(2)}${symbol}`;
 }
 
 export default function GroupTab({ tripId }: Props) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [balances, setBalances] = useState<Map<string, number>>(new Map());
+  const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,17 +43,41 @@ export default function GroupTab({ tripId }: Props) {
 
     const { data: trip } = await supabase
       .from('trips')
-      .select('invite_code')
+      .select('invite_code, currency')
       .eq('id', tripId)
       .single();
-    setInviteCode((trip as { invite_code: string | null } | null)?.invite_code ?? null);
+    const tripRow = trip as { invite_code: string | null; currency: string } | null;
+    setInviteCode(tripRow?.invite_code ?? null);
+    setCurrency(tripRow?.currency ?? 'EUR');
 
     const { data: memberRows } = await supabase
       .from('trip_members')
-      .select('id, role, status, user:users(full_name, avatar_url)')
+      .select('id, user_id, role, status, user:users(full_name, avatar_url)')
       .eq('trip_id', tripId);
+    const memberList = (memberRows as unknown as Member[]) ?? [];
+    setMembers(memberList);
 
-    setMembers((memberRows as unknown as Member[]) ?? []);
+    const { data: expenseRows } = await supabase
+      .from('expenses')
+      .select('id, paid_by, amount')
+      .eq('trip_id', tripId);
+    const expenses = (expenseRows as { id: string; paid_by: string; amount: number }[]) ?? [];
+
+    let splits: { user_id: string; amount_owed: number }[] = [];
+    if (expenses.length > 0) {
+      const { data: splitRows } = await supabase
+        .from('expense_splits')
+        .select('user_id, amount_owed')
+        .in('expense_id', expenses.map((e) => e.id));
+      splits = (splitRows as { user_id: string; amount_owed: number }[]) ?? [];
+    }
+
+    const net = new Map<string, number>();
+    for (const m of memberList) net.set(m.user_id, 0);
+    for (const e of expenses) net.set(e.paid_by, (net.get(e.paid_by) ?? 0) + Number(e.amount));
+    for (const s of splits) net.set(s.user_id, (net.get(s.user_id) ?? 0) - Number(s.amount_owed));
+    setBalances(net);
+
     setLoading(false);
   }
 
@@ -73,31 +101,36 @@ export default function GroupTab({ tripId }: Props) {
       <View style={styles.inviteCard}>
         <Text style={styles.inviteLabel}>Codice invito</Text>
         <Text style={styles.inviteCode}>{inviteCode ?? '——————'}</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <Text style={styles.shareButtonText}>Condividi invito</Text>
-        </TouchableOpacity>
+        {inviteCode && (
+          <View style={styles.qrWrapper}>
+            <QRCode value={inviteCode} size={110} color={colors.background} backgroundColor={colors.text} />
+          </View>
+        )}
+        <GradientButton label="Condividi invito" onPress={handleShare} style={styles.shareButton} />
       </View>
 
       <Text style={styles.sectionTitle}>Membri ({members.length})</Text>
 
-      {members.map((member) => (
-        <View key={member.id} style={styles.memberRow}>
-          <View style={styles.memberAvatar}>
-            {member.user?.avatar_url ? (
-              <Image source={{ uri: member.user.avatar_url }} style={styles.memberAvatarImage} />
-            ) : (
-              <Text style={styles.memberAvatarText}>{initials(member.user?.full_name ?? null)}</Text>
+      {members.map((member) => {
+        const net = balances.get(member.user_id) ?? 0;
+        return (
+          <View key={member.id} style={styles.memberRow}>
+            <Avatar name={member.user?.full_name ?? null} uri={member.user?.avatar_url} size={44} />
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>{member.user?.full_name ?? 'Utente'}</Text>
+              <Text style={styles.memberRole}>
+                {member.role === 'admin' ? 'Admin' : 'Membro'}
+                {member.status === 'pending' ? ' · in attesa' : ''}
+              </Text>
+            </View>
+            {Math.abs(net) > 0.01 && (
+              <Text style={[styles.balance, net > 0 ? styles.balancePositive : styles.balanceNegative]}>
+                {formatAmount(net, currency)}
+              </Text>
             )}
           </View>
-          <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>{member.user?.full_name ?? 'Utente'}</Text>
-            <Text style={styles.memberRole}>
-              {member.role === 'admin' ? 'Admin' : 'Membro'}
-              {member.status === 'pending' ? ' · in attesa' : ''}
-            </Text>
-          </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -114,16 +147,8 @@ const styles = StyleSheet.create({
   },
   inviteLabel: { ...typography.caption, color: colors.textMuted },
   inviteCode: { ...typography.monoLg, color: colors.accent, letterSpacing: 6, fontSize: 28 },
-  shareButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 44,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  shareButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
+  qrWrapper: { padding: spacing.sm, backgroundColor: colors.text, borderRadius: radius.buttonPrimary },
+  shareButton: { width: '100%', marginTop: spacing.xs },
   sectionTitle: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase' },
   memberRow: {
     flexDirection: 'row',
@@ -133,18 +158,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     padding: spacing.md,
   },
-  memberAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  memberAvatarImage: { width: 44, height: 44 },
-  memberAvatarText: { ...typography.body, fontWeight: '700', color: colors.text },
   memberInfo: { flex: 1 },
   memberName: { ...typography.body, color: colors.text, fontWeight: '600' },
   memberRole: { ...typography.caption, color: colors.textMuted },
+  balance: { ...typography.monoSm },
+  balancePositive: { color: colors.success },
+  balanceNegative: { color: colors.danger },
 });

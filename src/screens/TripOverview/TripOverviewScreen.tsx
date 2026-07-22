@@ -5,6 +5,7 @@ import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import type { Trip } from '../../types/database';
+import AvatarStack from '../../components/AvatarStack';
 import ItinerarioTab from './tabs/ItinerarioTab';
 import BudgetTab from './tabs/BudgetTab';
 import GroupTab from './tabs/GroupTab';
@@ -23,9 +24,17 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'checklist', label: 'Checklist' },
 ];
 
+interface Member {
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 export default function TripOverviewScreen({ route, navigation }: Props) {
   const { tripId } = route.params;
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [totalSpent, setTotalSpent] = useState(0);
+  const [openVotesCount, setOpenVotesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('itinerario');
 
@@ -35,8 +44,31 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   async function loadTrip() {
     setLoading(true);
+
     const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
-    setTrip(data as Trip | null);
+    const tripRow = data as Trip | null;
+    setTrip(tripRow);
+
+    const { data: memberRows } = await supabase
+      .from('trip_members')
+      .select('user:users(full_name, avatar_url)')
+      .eq('trip_id', tripId)
+      .eq('status', 'accepted');
+    const memberList = ((memberRows as unknown as { user: Member | null }[]) ?? [])
+      .filter((r) => r.user)
+      .map((r) => r.user!);
+    setMembers(memberList);
+
+    const { data: expenseRows } = await supabase.from('expenses').select('amount').eq('trip_id', tripId);
+    setTotalSpent(((expenseRows as { amount: number }[]) ?? []).reduce((sum, e) => sum + Number(e.amount), 0));
+
+    const { count } = await supabase
+      .from('votes')
+      .select('id', { count: 'exact', head: true })
+      .eq('trip_id', tripId)
+      .eq('status', 'open');
+    setOpenVotesCount(count ?? 0);
+
     setLoading(false);
   }
 
@@ -63,6 +95,8 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
     0,
     Math.ceil((new Date(trip.start_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   );
+  const budgetTotal = trip.budget_per_person ? trip.budget_per_person * members.length : null;
+  const currencySymbol = trip.currency === 'EUR' ? '€' : trip.currency;
 
   return (
     <View style={styles.flex}>
@@ -82,18 +116,29 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
         <View style={{ width: 24 }} />
       </View>
 
+      {members.length > 0 && (
+        <View style={styles.avatarRow}>
+          <AvatarStack members={members} size={28} max={5} />
+        </View>
+      )}
+
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
           <Text style={styles.statValue}>{daysRemaining}</Text>
           <Text style={styles.statLabel}>giorni</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>
-            {trip.budget_per_person ?? '–'}
-            {trip.currency === 'EUR' ? '€' : ''}
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+            {totalSpent.toFixed(0)}
+            {currencySymbol}
+            {budgetTotal ? ` / ${budgetTotal.toFixed(0)}${currencySymbol}` : ''}
           </Text>
-          <Text style={styles.statLabel}>a testa</Text>
+          <Text style={styles.statLabel}>speso</Text>
         </View>
+        <TouchableOpacity style={styles.statBox} onPress={() => navigation.navigate('Voting', { tripId })}>
+          <Text style={[styles.statValue, openVotesCount > 0 && styles.statValueAlert]}>{openVotesCount}</Text>
+          <Text style={styles.statLabel}>decisioni</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.tabBar}>
@@ -112,7 +157,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       </View>
 
       {activeTab === 'chat' ? (
-        <ChatTab tripId={tripId} />
+        <ChatTab tripId={tripId} navigation={navigation} />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {activeTab === 'itinerario' && <ItinerarioTab tripId={tripId} />}
@@ -148,15 +193,18 @@ const styles = StyleSheet.create({
   headerTextBlock: { alignItems: 'center' },
   tripName: { ...typography.h2, color: colors.text },
   tripDates: { ...typography.caption, color: colors.textMuted },
-  statsRow: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.md },
+  avatarRow: { alignItems: 'center', marginBottom: spacing.sm },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md },
   statBox: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.card,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
   },
-  statValue: { ...typography.monoLg, color: colors.text },
+  statValue: { ...typography.monoLg, color: colors.text, fontSize: 18 },
+  statValueAlert: { color: colors.danger },
   statLabel: { ...typography.caption, color: colors.textMuted },
   tabBar: {
     flexDirection: 'row',

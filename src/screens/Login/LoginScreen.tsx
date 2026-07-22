@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,7 +18,7 @@ import { supabase } from '../../lib/supabase';
 import { translateAuthError } from '../../lib/authErrors';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import AnimatedBackground from '../../components/AnimatedBackground';
-import PressableScale from '../../components/PressableScale';
+import GradientButton from '../../components/GradientButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -126,13 +125,7 @@ export default function LoginScreen({ navigation }: Props) {
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
-          <PressableScale style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.buttonPrimaryText}>Accedi</Text>
-            )}
-          </PressableScale>
+          <GradientButton label="Accedi" onPress={handleLogin} loading={loading} />
 
           <TouchableOpacity
             style={styles.buttonOutline}
@@ -193,14 +186,6 @@ const styles = StyleSheet.create({
   },
   forgotLink: { alignSelf: 'flex-end', marginTop: -spacing.xs },
   forgotLinkText: { ...typography.caption, color: colors.accent },
-  buttonPrimary: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPrimaryText: { ...typography.body, fontWeight: '600', color: colors.text },
   buttonOutline: {
     borderWidth: 1.5,
     borderColor: colors.primary,

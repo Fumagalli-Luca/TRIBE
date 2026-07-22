@@ -11,6 +11,8 @@ import {
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import { simplifyDebts, type MemberBalance } from '../../../lib/balances';
+import ProgressRing from '../../../components/ProgressRing';
+import GradientButton from '../../../components/GradientButton';
 import type { Expense, ExpenseCategory, ExpenseSplit } from '../../../types/database';
 
 interface Props {
@@ -125,9 +127,6 @@ export default function BudgetTab({ tripId }: Props) {
   }, [members, expenses, splits]);
 
   const transactions = useMemo(() => simplifyDebts(balances), [balances]);
-  const myTransactions = transactions.filter(
-    (t) => t.fromUserId === userId || t.toUserId === userId
-  );
 
   const progressRatio = budgetTotal ? Math.min(1, totalSpent / budgetTotal) : 0;
   const overBudget = budgetTotal !== null && totalSpent > budgetTotal;
@@ -195,38 +194,46 @@ export default function BudgetTab({ tripId }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
+        <View style={styles.summaryLeft}>
+          <Text style={styles.summaryLabel}>Totale speso</Text>
           <Text style={styles.summarySpent}>{formatAmount(totalSpent, currency)}</Text>
           {budgetTotal !== null && (
-            <Text style={styles.summaryTotal}>/ {formatAmount(budgetTotal, currency)}</Text>
+            <Text style={styles.summaryTotal}>di {formatAmount(budgetTotal, currency)}</Text>
           )}
         </View>
         {budgetTotal !== null && (
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progressRatio * 100}%`,
-                  backgroundColor: overBudget ? colors.danger : colors.success,
-                },
-              ]}
-            />
-          </View>
+          <ProgressRing progress={progressRatio} color={overBudget ? colors.danger : colors.success}>
+            <Text style={styles.ringLabel}>{Math.round(progressRatio * 100)}%</Text>
+          </ProgressRing>
         )}
       </View>
 
       <View>
         <Text style={styles.sectionTitle}>Il tuo saldo</Text>
-        {myTransactions.length === 0 ? (
-          <Text style={styles.emptyText}>Sei in pari con il gruppo.</Text>
+        {(() => {
+          const mine = balances.find((b) => b.userId === userId);
+          const net = mine?.net ?? 0;
+          if (Math.abs(net) < 0.01) {
+            return <Text style={styles.emptyText}>Sei in pari con il gruppo.</Text>;
+          }
+          return (
+            <Text style={[styles.myBalance, net > 0 ? styles.myBalancePositive : styles.myBalanceNegative]}>
+              {net > 0 ? 'Devi ricevere ' : 'Devi dare '}
+              {formatAmount(Math.abs(net), currency)}
+            </Text>
+          );
+        })()}
+      </View>
+
+      <View>
+        <Text style={styles.sectionTitle}>Saldi semplificati</Text>
+        {transactions.length === 0 ? (
+          <Text style={styles.emptyText}>Il gruppo è in pari.</Text>
         ) : (
-          myTransactions.map((t, i) => (
+          transactions.map((t, i) => (
             <View key={i} style={styles.balanceRow}>
               <Text style={styles.balanceText}>
-                {t.fromUserId === userId
-                  ? `Devi dare ${formatAmount(t.amount, currency)} a ${t.toName}`
-                  : `${t.fromName} ti deve dare ${formatAmount(t.amount, currency)}`}
+                {t.fromName} deve {formatAmount(t.amount, currency)} a {t.toName}
               </Text>
             </View>
           ))
@@ -255,9 +262,7 @@ export default function BudgetTab({ tripId }: Props) {
         )}
       </View>
 
-      <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
-        <Text style={styles.addButtonText}>+ Aggiungi spesa</Text>
-      </TouchableOpacity>
+      <GradientButton label="+ Aggiungi spesa" onPress={() => setModalVisible(true)} />
 
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -352,19 +357,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: spacing.lg,
-    gap: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  summaryRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  summaryLeft: { gap: 2 },
+  summaryLabel: { ...typography.caption, color: colors.textMuted },
   summarySpent: { ...typography.monoLg, color: colors.text },
   summaryTotal: { ...typography.monoSm, color: colors.textMuted },
-  progressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
-  progressFill: { height: 8 },
+  ringLabel: { ...typography.body, fontWeight: '700', color: colors.text },
   sectionTitle: {
     ...typography.caption,
     color: colors.textMuted,
     textTransform: 'uppercase',
     marginBottom: spacing.sm,
   },
+  myBalance: { ...typography.monoLg, fontSize: 20 },
+  myBalancePositive: { color: colors.success },
+  myBalanceNegative: { color: colors.danger },
   balanceRow: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -386,14 +396,6 @@ const styles = StyleSheet.create({
   expenseDescription: { ...typography.body, color: colors.text, fontWeight: '600' },
   expenseMeta: { ...typography.caption, color: colors.textMuted },
   expenseAmount: { ...typography.monoSm, color: colors.text },
-  addButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,

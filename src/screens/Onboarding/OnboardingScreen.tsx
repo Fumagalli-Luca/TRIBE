@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import AnimatedBackground from '../../components/AnimatedBackground';
-import PressableScale from '../../components/PressableScale';
+import GradientButton from '../../components/GradientButton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
@@ -79,11 +79,11 @@ export default function OnboardingScreen({ navigation }: Props) {
         ))}
       </View>
 
-      <PressableScale style={styles.primaryButton} onPress={handleNext} disabled={saving}>
-        <Text style={styles.primaryButtonText}>
-          {slideIndex < SLIDES.length - 1 ? 'Avanti' : 'Iniziamo'}
-        </Text>
-      </PressableScale>
+      <GradientButton
+        label={slideIndex < SLIDES.length - 1 ? 'Avanti' : 'Iniziamo'}
+        onPress={handleNext}
+        loading={saving}
+      />
     </View>
   );
 }
@@ -109,12 +109,4 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   dotActive: { backgroundColor: colors.primary, width: 20 },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
 });
