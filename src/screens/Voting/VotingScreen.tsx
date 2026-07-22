@@ -19,6 +19,8 @@ import { supabase } from '../../lib/supabase';
 import SwipeCard from '../../components/SwipeCard';
 import Chip from '../../components/Chip';
 import GradientButton from '../../components/GradientButton';
+import Confetti from '../../components/Confetti';
+import { hapticImpact, hapticSuccess } from '../../lib/haptics';
 import type { Vote, VoteChoiceRow, VoteOption } from '../../types/database';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Voting'>;
@@ -138,6 +140,7 @@ export default function VotingScreen({ route, navigation }: Props) {
 
   async function recordChoice(option: VoteOption, decision: 'yes' | 'no') {
     if (!vote || !userId) return;
+    hapticImpact();
     setChoices((prev) => [
       ...prev.filter((c) => !(c.user_id === userId && c.option_id === option.id)),
       {
@@ -196,6 +199,7 @@ export default function VotingScreen({ route, navigation }: Props) {
       content: `Il gruppo ha scelto ${winner.name}! ${winnerYes} voti positivi su ${totalCast || winnerYes}.`,
     });
 
+    hapticSuccess();
     setClosing(false);
     await load();
   }
@@ -294,6 +298,7 @@ export default function VotingScreen({ route, navigation }: Props) {
 
     return (
       <View style={styles.flex}>
+        <Confetti />
         {header}
         <ScrollView contentContainerStyle={styles.resultsContent}>
           <Text style={styles.resultsTitle}>Risultato</Text>

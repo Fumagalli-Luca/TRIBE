@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,15 +9,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {
+  FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { POPULAR_DESTINATIONS, VIBE_OPTIONS } from '../../types/tripGenerator';
+import GradientButton from '../../components/GradientButton';
+import { hapticImpact } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateTrip'>;
 
 type Step = 'destination' | 'dates' | 'group' | 'vibe' | 'review';
+
+const TYPING_DELAY_MS = 650;
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -35,21 +49,59 @@ interface ChatMessage {
 
 function AIBubble({ text }: { text: string }) {
   return (
-    <View style={styles.aiBubbleRow}>
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.aiBubbleRow}>
       <View style={styles.aiBubble}>
         <Text style={styles.aiBubbleText}>{text}</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 function UserBubble({ text }: { text: string }) {
   return (
-    <View style={styles.userBubbleRow}>
+    <Animated.View entering={FadeInUp.duration(220)} style={styles.userBubbleRow}>
       <View style={styles.userBubble}>
         <Text style={styles.userBubbleText}>{text}</Text>
       </View>
-    </View>
+    </Animated.View>
+  );
+}
+
+function TypingIndicator() {
+  const dot1 = useSharedValue(0.3);
+  const dot2 = useSharedValue(0.3);
+  const dot3 = useSharedValue(0.3);
+
+  useEffect(() => {
+    const pulse = (delay: number) =>
+      withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 350, easing: Easing.inOut(Easing.ease) }),
+            withTiming(0.3, { duration: 350, easing: Easing.inOut(Easing.ease) })
+          ),
+          -1
+        )
+      );
+    dot1.value = pulse(0);
+    dot2.value = pulse(120);
+    dot3.value = pulse(240);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const style1 = useAnimatedStyle(() => ({ opacity: dot1.value }));
+  const style2 = useAnimatedStyle(() => ({ opacity: dot2.value }));
+  const style3 = useAnimatedStyle(() => ({ opacity: dot3.value }));
+
+  return (
+    <Animated.View entering={FadeInUp.duration(180)} style={styles.aiBubbleRow}>
+      <View style={[styles.aiBubble, styles.typingBubble]}>
+        <Animated.View style={[styles.typingDot, style1]} />
+        <Animated.View style={[styles.typingDot, style2]} />
+        <Animated.View style={[styles.typingDot, style3]} />
+      </View>
+    </Animated.View>
   );
 }
 
@@ -58,6 +110,7 @@ export default function CreateTripScreen({ navigation }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'q1', from: 'ai', text: 'Dove vi va di andare? 🌍' },
   ]);
+  const [typing, setTyping] = useState(false);
 
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -71,63 +124,68 @@ export default function CreateTripScreen({ navigation }: Props) {
     setMessages((prev) => [...prev, msg]);
   }
 
+  function pushUserThenAI(userMsg: ChatMessage, aiMsg: ChatMessage, nextStep: Step) {
+    hapticImpact();
+    pushMessage(userMsg);
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      pushMessage(aiMsg);
+      setStep(nextStep);
+    }, TYPING_DELAY_MS);
+  }
+
   function confirmDestination(value: string) {
     if (!value.trim()) return;
     setDestination(value.trim());
-    pushMessage({ id: `a-dest-${Date.now()}`, from: 'user', text: value.trim() });
-    pushMessage({ id: `q-dates-${Date.now()}`, from: 'ai', text: 'Quando partite? 📅' });
-    setStep('dates');
+    pushUserThenAI(
+      { id: `a-dest-${Date.now()}`, from: 'user', text: value.trim() },
+      { id: `q-dates-${Date.now()}`, from: 'ai', text: 'Quando partite? 📅' },
+      'dates'
+    );
   }
 
   function confirmDates() {
     if (!startDate || !endDate) return;
-    pushMessage({
-      id: `a-dates-${Date.now()}`,
-      from: 'user',
-      text: `${formatDateLabel(startDate)} → ${formatDateLabel(endDate)}`,
-    });
-    pushMessage({
-      id: `q-group-${Date.now()}`,
-      from: 'ai',
-      text: 'Quanti siete e con che budget a testa? 💰',
-    });
-    setStep('group');
+    pushUserThenAI(
+      {
+        id: `a-dates-${Date.now()}`,
+        from: 'user',
+        text: `${formatDateLabel(startDate)} → ${formatDateLabel(endDate)}`,
+      },
+      { id: `q-group-${Date.now()}`, from: 'ai', text: 'Quanti siete e con che budget a testa? 💰' },
+      'group'
+    );
   }
 
   function confirmGroup() {
     const budget = parseInt(budgetPerPerson, 10);
     if (!budget || budget <= 0) return;
-    pushMessage({
-      id: `a-group-${Date.now()}`,
-      from: 'user',
-      text: `${groupSize} persone, ${budget}€ a testa`,
-    });
-    pushMessage({
-      id: `q-vibe-${Date.now()}`,
-      from: 'ai',
-      text: 'Che vibe cercate? ✨',
-    });
-    setStep('vibe');
+    pushUserThenAI(
+      { id: `a-group-${Date.now()}`, from: 'user', text: `${groupSize} persone, ${budget}€ a testa` },
+      { id: `q-vibe-${Date.now()}`, from: 'ai', text: 'Che vibe cercate? ✨' },
+      'vibe'
+    );
   }
 
   function toggleVibe(key: string) {
+    hapticImpact();
     setVibe((prev) => (prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]));
   }
 
   function confirmVibe() {
     if (vibe.length === 0) return;
     const labels = VIBE_OPTIONS.filter((o) => vibe.includes(o.key)).map((o) => o.label);
-    pushMessage({ id: `a-vibe-${Date.now()}`, from: 'user', text: labels.join(', ') });
-    pushMessage({
-      id: `q-review-${Date.now()}`,
-      from: 'ai',
-      text: 'Perfetto, genero il vostro viaggio! 🚀',
-    });
-    setStep('review');
+    pushUserThenAI(
+      { id: `a-vibe-${Date.now()}`, from: 'user', text: labels.join(', ') },
+      { id: `q-review-${Date.now()}`, from: 'ai', text: 'Perfetto, genero il vostro viaggio! 🚀' },
+      'review'
+    );
   }
 
   function handleGenerate() {
     if (!startDate || !endDate) return;
+    hapticImpact();
     navigation.replace('AILoading', {
       payload: {
         destination,
@@ -165,156 +223,151 @@ export default function CreateTripScreen({ navigation }: Props) {
         {messages.map((m) =>
           m.from === 'ai' ? <AIBubble key={m.id} text={m.text} /> : <UserBubble key={m.id} text={m.text} />
         )}
+        {typing && <TypingIndicator />}
       </ScrollView>
 
-      <View style={styles.inputArea}>
-        {step === 'destination' && (
-          <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
-              {POPULAR_DESTINATIONS.map((d) => (
-                <TouchableOpacity key={d} style={styles.chip} onPress={() => confirmDestination(d)}>
-                  <Text style={styles.chipText}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Scrivi una destinazione..."
-                placeholderTextColor={colors.textMuted}
-                value={destination}
-                onChangeText={setDestination}
-                onSubmitEditing={() => confirmDestination(destination)}
-              />
-              <TouchableOpacity style={styles.sendButton} onPress={() => confirmDestination(destination)}>
-                <Text style={styles.sendButtonText}>›</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-
-        {step === 'dates' && (
-          <>
-            <View style={styles.inputRow}>
-              <TouchableOpacity
-                style={[styles.textInput, styles.flexInput, styles.dateButton]}
-                onPress={() => setActiveDatePicker('start')}
-              >
-                <Text style={startDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
-                  {startDate ? formatDateLabel(startDate) : 'Data inizio'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.textInput, styles.flexInput, styles.dateButton]}
-                onPress={() => setActiveDatePicker('end')}
-              >
-                <Text style={endDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
-                  {endDate ? formatDateLabel(endDate) : 'Data fine'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {activeDatePicker && (
-              <DateTimePicker
-                value={(activeDatePicker === 'start' ? startDate : endDate) ?? new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                minimumDate={activeDatePicker === 'end' && startDate ? startDate : new Date()}
-                themeVariant="dark"
-                onChange={(_, selected) => {
-                  if (Platform.OS === 'android') setActiveDatePicker(null);
-                  if (!selected) return;
-                  if (activeDatePicker === 'start') {
-                    setStartDate(selected);
-                    if (endDate && endDate < selected) setEndDate(null);
-                  } else {
-                    setEndDate(selected);
-                  }
-                }}
-              />
-            )}
-
-            {Platform.OS === 'ios' && activeDatePicker && (
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => setActiveDatePicker(null)}
-              >
-                <Text style={styles.confirmButtonText}>Fatto</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.confirmButton} onPress={confirmDates}>
-              <Text style={styles.confirmButtonText}>Continua</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {step === 'group' && (
-          <>
-            <View style={styles.stepperRow}>
-              <Text style={styles.label}>Persone</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  style={styles.stepperButton}
-                  onPress={() => setGroupSize((v) => Math.max(2, v - 1))}
-                >
-                  <Text style={styles.stepperButtonText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{groupSize}</Text>
-                <TouchableOpacity
-                  style={styles.stepperButton}
-                  onPress={() => setGroupSize((v) => Math.min(20, v + 1))}
-                >
-                  <Text style={styles.stepperButtonText}>+</Text>
+      {!typing && (
+        <View style={styles.inputArea}>
+          {step === 'destination' && (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
+                {POPULAR_DESTINATIONS.map((d) => (
+                  <TouchableOpacity key={d} style={styles.chip} onPress={() => confirmDestination(d)}>
+                    <Text style={styles.chipText}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Scrivi una destinazione..."
+                  placeholderTextColor={colors.textMuted}
+                  value={destination}
+                  onChangeText={setDestination}
+                  onSubmitEditing={() => confirmDestination(destination)}
+                />
+                <TouchableOpacity style={styles.sendButton} onPress={() => confirmDestination(destination)}>
+                  <Text style={styles.sendButtonText}>›</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.inputRow}>
-              <Text style={styles.label}>Budget a testa (€)</Text>
-              <TextInput
-                style={[styles.textInput, styles.flexInput]}
-                keyboardType="number-pad"
-                placeholder="300"
-                placeholderTextColor={colors.textMuted}
-                value={budgetPerPerson}
-                onChangeText={setBudgetPerPerson}
-              />
-            </View>
-            <TouchableOpacity style={styles.confirmButton} onPress={confirmGroup}>
-              <Text style={styles.confirmButtonText}>Continua</Text>
-            </TouchableOpacity>
-          </>
-        )}
+            </>
+          )}
 
-        {step === 'vibe' && (
-          <>
-            <View style={styles.vibeGrid}>
-              {VIBE_OPTIONS.map((o) => (
+          {step === 'dates' && (
+            <>
+              <View style={styles.inputRow}>
                 <TouchableOpacity
-                  key={o.key}
-                  style={[styles.chip, vibe.includes(o.key) && styles.chipSelected]}
-                  onPress={() => toggleVibe(o.key)}
+                  style={[styles.textInput, styles.flexInput, styles.dateButton]}
+                  onPress={() => setActiveDatePicker('start')}
                 >
-                  <Text
-                    style={[styles.chipText, vibe.includes(o.key) && styles.chipTextSelected]}
-                  >
-                    {o.label}
+                  <Text style={startDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+                    {startDate ? formatDateLabel(startDate) : 'Data inizio'}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.confirmButton} onPress={confirmVibe}>
-              <Text style={styles.confirmButtonText}>Continua</Text>
-            </TouchableOpacity>
-          </>
-        )}
+                <TouchableOpacity
+                  style={[styles.textInput, styles.flexInput, styles.dateButton]}
+                  onPress={() => setActiveDatePicker('end')}
+                >
+                  <Text style={endDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+                    {endDate ? formatDateLabel(endDate) : 'Data fine'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-        {step === 'review' && (
-          <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
-            <Text style={styles.confirmButtonText}>Genera il viaggio con l'AI ✨</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+              {activeDatePicker && (
+                <DateTimePicker
+                  value={(activeDatePicker === 'start' ? startDate : endDate) ?? new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                  minimumDate={activeDatePicker === 'end' && startDate ? startDate : new Date()}
+                  themeVariant="dark"
+                  onChange={(_, selected) => {
+                    if (Platform.OS === 'android') setActiveDatePicker(null);
+                    if (!selected) return;
+                    if (activeDatePicker === 'start') {
+                      setStartDate(selected);
+                      if (endDate && endDate < selected) setEndDate(null);
+                    } else {
+                      setEndDate(selected);
+                    }
+                  }}
+                />
+              )}
+
+              {Platform.OS === 'ios' && activeDatePicker && (
+                <TouchableOpacity
+                  style={styles.confirmButtonOutline}
+                  onPress={() => setActiveDatePicker(null)}
+                >
+                  <Text style={styles.confirmButtonOutlineText}>Fatto</Text>
+                </TouchableOpacity>
+              )}
+
+              <GradientButton label="Continua" onPress={confirmDates} />
+            </>
+          )}
+
+          {step === 'group' && (
+            <>
+              <View style={styles.stepperRow}>
+                <Text style={styles.label}>Persone</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    style={styles.stepperButton}
+                    onPress={() => setGroupSize((v) => Math.max(2, v - 1))}
+                  >
+                    <Text style={styles.stepperButtonText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{groupSize}</Text>
+                  <TouchableOpacity
+                    style={styles.stepperButton}
+                    onPress={() => setGroupSize((v) => Math.min(20, v + 1))}
+                  >
+                    <Text style={styles.stepperButtonText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.inputRow}>
+                <Text style={styles.label}>Budget a testa (€)</Text>
+                <TextInput
+                  style={[styles.textInput, styles.flexInput]}
+                  keyboardType="number-pad"
+                  placeholder="300"
+                  placeholderTextColor={colors.textMuted}
+                  value={budgetPerPerson}
+                  onChangeText={setBudgetPerPerson}
+                />
+              </View>
+              <GradientButton label="Continua" onPress={confirmGroup} />
+            </>
+          )}
+
+          {step === 'vibe' && (
+            <>
+              <View style={styles.vibeGrid}>
+                {VIBE_OPTIONS.map((o) => (
+                  <TouchableOpacity
+                    key={o.key}
+                    style={[styles.chip, vibe.includes(o.key) && styles.chipSelected]}
+                    onPress={() => toggleVibe(o.key)}
+                  >
+                    <Text
+                      style={[styles.chipText, vibe.includes(o.key) && styles.chipTextSelected]}
+                    >
+                      {o.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <GradientButton label="Continua" onPress={confirmVibe} />
+            </>
+          )}
+
+          {step === 'review' && (
+            <GradientButton label="Genera il viaggio con l'AI ✨" onPress={handleGenerate} />
+          )}
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -340,6 +393,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     maxWidth: '80%',
   },
+  typingBubble: { flexDirection: 'row', gap: 5, paddingVertical: spacing.md + 2 },
+  typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.textMuted },
   aiBubbleText: { ...typography.body, color: colors.text },
   userBubbleRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   userBubble: {
@@ -410,19 +465,13 @@ const styles = StyleSheet.create({
   },
   stepperButtonText: { ...typography.h2, color: colors.text },
   stepperValue: { ...typography.monoLg, color: colors.text, minWidth: 32, textAlign: 'center' },
-  confirmButton: {
-    backgroundColor: colors.primary,
+  confirmButtonOutline: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
     borderRadius: radius.buttonPrimary,
-    height: 52,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmButtonText: { ...typography.body, fontWeight: '600', color: colors.text },
-  generateButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.buttonPrimary,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  confirmButtonOutlineText: { ...typography.body, fontWeight: '600', color: colors.primary },
 });

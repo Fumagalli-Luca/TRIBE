@@ -13,6 +13,8 @@ import { supabase } from '../../../lib/supabase';
 import { simplifyDebts, type MemberBalance } from '../../../lib/balances';
 import ProgressRing from '../../../components/ProgressRing';
 import GradientButton from '../../../components/GradientButton';
+import { hapticSuccess } from '../../../lib/haptics';
+import { useCountUp } from '../../../lib/useCountUp';
 import type { Expense, ExpenseCategory, ExpenseSplit } from '../../../types/database';
 
 interface Props {
@@ -113,6 +115,7 @@ export default function BudgetTab({ tripId }: Props) {
   }
 
   const totalSpent = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0), [expenses]);
+  const animatedTotalSpent = useCountUp(totalSpent);
 
   const balances: MemberBalance[] = useMemo(() => {
     return members.map((m) => {
@@ -174,6 +177,7 @@ export default function BudgetTab({ tripId }: Props) {
 
       await supabase.from('expense_splits').insert(splitPayload);
 
+      hapticSuccess();
       setDescription('');
       setAmount('');
       setCategory('other');
@@ -196,7 +200,7 @@ export default function BudgetTab({ tripId }: Props) {
       <View style={styles.summaryCard}>
         <View style={styles.summaryLeft}>
           <Text style={styles.summaryLabel}>Totale speso</Text>
-          <Text style={styles.summarySpent}>{formatAmount(totalSpent, currency)}</Text>
+          <Text style={styles.summarySpent}>{formatAmount(animatedTotalSpent, currency)}</Text>
           {budgetTotal !== null && (
             <Text style={styles.summaryTotal}>di {formatAmount(budgetTotal, currency)}</Text>
           )}

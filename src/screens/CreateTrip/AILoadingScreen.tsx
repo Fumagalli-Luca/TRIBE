@@ -68,6 +68,8 @@ export default function AILoadingScreen({ route, navigation }: Props) {
     setStatus('loading');
     setErrorMessage(null);
     startedRef.current = true;
+    progress.value = 0;
+    progress.value = withTiming(0.92, { duration: TIMEOUT_MS, easing: Easing.out(Easing.cubic) });
 
     const timeoutPromise = new Promise<'timeout'>((resolve) =>
       setTimeout(() => resolve('timeout'), TIMEOUT_MS)
@@ -92,7 +94,8 @@ export default function AILoadingScreen({ route, navigation }: Props) {
         return;
       }
 
-      navigation.replace('TripOverview', { tripId: data.trip_id });
+      progress.value = withTiming(1, { duration: 250 });
+      setTimeout(() => navigation.replace('TripOverview', { tripId: data.trip_id }), 200);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Errore sconosciuto');
       setStatus('error');
@@ -106,6 +109,7 @@ export default function AILoadingScreen({ route, navigation }: Props) {
 
   const pulse = useSharedValue(1);
   const glowOpacity = useSharedValue(0.85);
+  const progress = useSharedValue(0);
 
   useEffect(() => {
     pulse.value = withRepeat(
@@ -129,6 +133,10 @@ export default function AILoadingScreen({ route, navigation }: Props) {
     opacity: glowOpacity.value,
   }));
 
+  const progressStyle = useAnimatedStyle(() => ({
+    width: `${progress.value * 100}%`,
+  }));
+
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.pulseCircle, pulseStyle]} />
@@ -145,6 +153,10 @@ export default function AILoadingScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         </>
       )}
+
+      <View style={styles.progressTrack}>
+        <Animated.View style={[styles.progressFill, progressStyle]} />
+      </View>
     </View>
   );
 }
@@ -191,5 +203,19 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '600',
     color: colors.text,
+  },
+  progressTrack: {
+    position: 'absolute',
+    bottom: spacing.xl,
+    left: spacing.xl,
+    right: spacing.xl,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 3,
+    backgroundColor: colors.primary,
   },
 });

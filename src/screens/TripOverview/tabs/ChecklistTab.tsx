@@ -12,6 +12,7 @@ import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import Chip from '../../../components/Chip';
 import GradientButton from '../../../components/GradientButton';
+import { hapticSelect } from '../../../lib/haptics';
 import type { ChecklistCategory, ChecklistItem } from '../../../types/database';
 
 interface Props {
@@ -58,6 +59,7 @@ export default function ChecklistTab({ tripId }: Props) {
   }
 
   async function toggleDone(item: ChecklistItem) {
+    hapticSelect();
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, is_done: !i.is_done } : i))
     );
