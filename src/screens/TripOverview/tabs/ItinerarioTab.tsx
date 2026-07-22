@@ -9,11 +9,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Filter } from 'lucide-react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
+import { Check, Filter, GripVertical, Trash2 } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import GradientButton from '../../../components/GradientButton';
 import Chip from '../../../components/Chip';
+import { hapticImpact, hapticSelect } from '../../../lib/haptics';
 import type { ItineraryActivity, ItineraryDay, ItineraryTimeSlot } from '../../../types/database';
 
 interface Props {
@@ -83,7 +86,9 @@ export default function ItinerarioTab({ tripId }: Props) {
   }
 
   const dayActivities = useMemo(() => {
-    const filtered = activities.filter((a) => a.itinerary_day_id === selectedDayId);
+    const filtered = activities.filter(
+      (a) => a.itinerary_day_id === selectedDayId && a.status !== 'removed'
+    );
     return categoryFilter ? filtered.filter((a) => a.category === categoryFilter) : filtered;
   }, [activities, selectedDayId, categoryFilter]);
 
@@ -122,6 +127,38 @@ export default function ItinerarioTab({ tripId }: Props) {
     setSaving(false);
   }
 
+  async function handleConfirmActivity(activity: ItineraryActivity) {
+    hapticImpact();
+    setActivities((prev) =>
+      prev.map((a) => (a.id === activity.id ? { ...a, status: 'confirmed' } : a))
+    );
+    await supabase.from('itinerary_activities').update({ status: 'confirmed' }).eq('id', activity.id);
+  }
+
+  async function handleRemoveActivity(activity: ItineraryActivity) {
+    hapticImpact();
+    setActivities((prev) =>
+      prev.map((a) => (a.id === activity.id ? { ...a, status: 'removed' } : a))
+    );
+    await supabase.from('itinerary_activities').update({ status: 'removed' }).eq('id', activity.id);
+  }
+
+  async function handleDragEnd(reordered: ItineraryActivity[]) {
+    hapticSelect();
+    const reorderedIds = new Set(reordered.map((a) => a.id));
+    setActivities((prev) => {
+      const untouched = prev.filter((a) => !reorderedIds.has(a.id));
+      const updated = reordered.map((a, index) => ({ ...a, order_index: index }));
+      return [...untouched, ...updated];
+    });
+
+    await Promise.all(
+      reordered.map((a, index) =>
+        supabase.from('itinerary_activities').update({ order_index: index }).eq('id', a.id)
+      )
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -138,8 +175,8 @@ export default function ItinerarioTab({ tripId }: Props) {
     );
   }
 
-  return (
-    <View style={styles.container}>
+  const header = (
+    <View style={styles.headerBlock}>
       <View style={styles.dayTabsRow}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
           {days.map((day) => (
@@ -173,41 +210,79 @@ export default function ItinerarioTab({ tripId }: Props) {
           ))}
         </View>
       )}
+    </View>
+  );
 
-      <View style={styles.timeline}>
-        {dayActivities.length === 0 ? (
-          <Text style={styles.emptyText}>Nessuna attività per questo giorno.</Text>
-        ) : (
-          dayActivities.map((a, index) => (
-            <View key={a.id} style={styles.timelineRow}>
-              <View style={styles.timelineMarkerCol}>
-                <View style={styles.timelineDot} />
-                {index < dayActivities.length - 1 && <View style={styles.timelineLine} />}
-              </View>
-              <View style={styles.activityCard}>
-                <View style={styles.activityIconBox}>
-                  <Text style={styles.activityIcon}>{categoryEmoji(a.category)}</Text>
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle}>{a.title}</Text>
-                  <Text style={styles.activityMeta}>
-                    {TIME_SLOT_LABEL[a.time_slot ?? ''] ?? a.time_slot}
-                    {a.duration_minutes ? ` · ${a.duration_minutes} min` : ''}
-                    {a.location_name ? ` · ${a.location_name}` : ''}
-                  </Text>
-                  <View style={styles.tagRow}>
-                    <Text style={[styles.tag, a.source === 'ai' ? styles.tagAi : styles.tagConfirmed]}>
-                      {a.source === 'ai' ? 'AI suggerito' : 'Confermato'}
-                    </Text>
-                  </View>
-                </View>
+  function renderActivity({ item: a, drag, isActive, getIndex }: RenderItemParams<ItineraryActivity>) {
+    const index = getIndex() ?? 0;
+    return (
+      <Swipeable
+        renderLeftActions={() => (
+          <TouchableOpacity
+            style={[styles.swipeAction, styles.swipeActionConfirm]}
+            onPress={() => handleConfirmActivity(a)}
+          >
+            <Check size={20} color={colors.text} />
+          </TouchableOpacity>
+        )}
+        renderRightActions={() => (
+          <TouchableOpacity
+            style={[styles.swipeAction, styles.swipeActionRemove]}
+            onPress={() => handleRemoveActivity(a)}
+          >
+            <Trash2 size={20} color={colors.text} />
+          </TouchableOpacity>
+        )}
+      >
+        <View style={styles.timelineRow}>
+          <View style={styles.timelineMarkerCol}>
+            <View style={styles.timelineDot} />
+            {index < dayActivities.length - 1 && <View style={styles.timelineLine} />}
+          </View>
+          <View style={[styles.activityCard, isActive && styles.activityCardActive]}>
+            <View style={styles.activityIconBox}>
+              <Text style={styles.activityIcon}>{categoryEmoji(a.category)}</Text>
+            </View>
+            <View style={styles.activityInfo}>
+              <Text style={styles.activityTitle}>{a.title}</Text>
+              <Text style={styles.activityMeta}>
+                {TIME_SLOT_LABEL[a.time_slot ?? ''] ?? a.time_slot}
+                {a.duration_minutes ? ` · ${a.duration_minutes} min` : ''}
+                {a.location_name ? ` · ${a.location_name}` : ''}
+              </Text>
+              <View style={styles.tagRow}>
+                <Text style={[styles.tag, a.source === 'ai' ? styles.tagAi : styles.tagConfirmed]}>
+                  {a.source === 'ai' ? 'AI suggerito' : 'Confermato'}
+                </Text>
               </View>
             </View>
-          ))
-        )}
-      </View>
+            <TouchableOpacity onLongPress={drag} disabled={isActive} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <GripVertical size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Swipeable>
+    );
+  }
 
-      <GradientButton label="+ Aggiungi attività" onPress={() => setModalVisible(true)} />
+  return (
+    <View style={styles.flex}>
+      <DraggableFlatList
+        data={dayActivities}
+        keyExtractor={(a) => a.id}
+        renderItem={renderActivity}
+        onDragEnd={({ data }) => handleDragEnd(data)}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<Text style={styles.emptyText}>Nessuna attività per questo giorno.</Text>}
+        ListFooterComponent={
+          <GradientButton
+            label="+ Aggiungi attività"
+            onPress={() => setModalVisible(true)}
+            style={styles.addButton}
+          />
+        }
+        contentContainerStyle={styles.listContent}
+      />
 
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -276,9 +351,11 @@ export default function ItinerarioTab({ tripId }: Props) {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   centered: { paddingVertical: spacing.xl, alignItems: 'center' },
-  emptyText: { ...typography.body, color: colors.textMuted },
-  container: { gap: spacing.lg },
+  emptyText: { ...typography.body, color: colors.textMuted, padding: spacing.md },
+  listContent: { padding: spacing.md, paddingBottom: spacing.xl, gap: 0 },
+  headerBlock: { gap: spacing.md, marginBottom: spacing.md },
   dayTabsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   filterButton: {
     width: 32,
@@ -289,7 +366,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  timeline: { gap: 0 },
   timelineRow: { flexDirection: 'row', gap: spacing.sm },
   timelineMarkerCol: { alignItems: 'center', width: 16 },
   timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent, marginTop: spacing.md },
@@ -297,11 +373,17 @@ const styles = StyleSheet.create({
   activityCard: {
     flex: 1,
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: spacing.md,
     gap: spacing.md,
     marginBottom: spacing.md,
+  },
+  activityCardActive: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    opacity: 0.9,
   },
   activityIconBox: {
     width: 44,
@@ -327,6 +409,17 @@ const styles = StyleSheet.create({
   },
   tagAi: { color: colors.accent, backgroundColor: 'rgba(56,189,248,0.15)' },
   tagConfirmed: { color: colors.success, backgroundColor: 'rgba(34,197,94,0.15)' },
+  swipeAction: {
+    width: 72,
+    marginBottom: spacing.md,
+    marginLeft: spacing.xs,
+    borderRadius: radius.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeActionConfirm: { backgroundColor: colors.success },
+  swipeActionRemove: { backgroundColor: colors.danger },
+  addButton: { marginTop: spacing.sm },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,

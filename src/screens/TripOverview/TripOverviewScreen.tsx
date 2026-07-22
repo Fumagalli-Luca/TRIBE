@@ -160,9 +160,12 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
       {activeTab === 'chat' ? (
         <ChatTab tripId={tripId} navigation={navigation} />
+      ) : activeTab === 'itinerario' ? (
+        // Gestisce da sé lo scroll (DraggableFlatList per il drag-to-reorder):
+        // non va annidato in un altro ScrollView.
+        <ItinerarioTab tripId={tripId} />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          {activeTab === 'itinerario' && <ItinerarioTab tripId={tripId} />}
           {activeTab === 'budget' && <BudgetTab tripId={tripId} />}
           {activeTab === 'gruppo' && <GroupTab tripId={tripId} />}
           {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
