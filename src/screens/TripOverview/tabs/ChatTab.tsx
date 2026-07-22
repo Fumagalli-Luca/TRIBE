@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
@@ -108,7 +109,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
         renderItem={({ item }) => {
           const voteId = (item.metadata as { vote_id?: string } | null)?.vote_id;
           return item.type === 'system' ? (
-            <View style={styles.systemBubble}>
+            <Animated.View entering={FadeInUp.duration(220)} style={styles.systemBubble}>
               <Text style={styles.systemText}>{item.content}</Text>
               {voteId && (
                 <TouchableOpacity
@@ -118,9 +119,10 @@ export default function ChatTab({ tripId, navigation }: Props) {
                   <Text style={styles.voteButtonText}>VOTA ORA</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </Animated.View>
           ) : (
-            <View
+            <Animated.View
+              entering={FadeInUp.duration(220)}
               style={[
                 styles.messageBubble,
                 item.sender_id === userId ? styles.messageBubbleMine : styles.messageBubbleOther,
@@ -128,7 +130,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
             >
               <Text style={styles.messageText}>{item.content}</Text>
               <Text style={styles.messageTime}>{formatTime(item.created_at)}</Text>
-            </View>
+            </Animated.View>
           );
         }}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessun messaggio ancora.</Text>}

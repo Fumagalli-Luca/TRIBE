@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, spacing, typography } from '../../constants/theme';
@@ -67,10 +68,14 @@ export default function OnboardingScreen({ navigation }: Props) {
         <Text style={styles.skipText}>Salta</Text>
       </TouchableOpacity>
 
-      <View style={styles.slideBlock}>
-        <Text style={styles.icon}>{slide.icon}</Text>
-        <Text style={styles.title}>{slide.title}</Text>
-        <Text style={styles.subtitle}>{slide.subtitle}</Text>
+      <View key={slideIndex} style={styles.slideBlock}>
+        <Animated.Text entering={FadeIn.duration(400)} style={styles.icon}>
+          {slide.icon}
+        </Animated.Text>
+        <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+          <Text style={styles.title}>{slide.title}</Text>
+          <Text style={styles.subtitle}>{slide.subtitle}</Text>
+        </Animated.View>
       </View>
 
       <View style={styles.dotsRow}>

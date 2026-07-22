@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { HomeNavigationProp } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -21,6 +29,7 @@ export default function TripsTab({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', load);
@@ -28,6 +37,12 @@ export default function TripsTab({ navigation }: Props) {
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -62,23 +77,30 @@ export default function TripsTab({ navigation }: Props) {
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-      ) : trips.length === 0 ? (
-        <Text style={styles.emptyText}>Nessun viaggio ancora.</Text>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {trips.map((trip) => (
-            <TouchableOpacity
-              key={trip.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('TripOverview', { tripId: trip.id })}
-            >
-              <Text style={styles.name}>{trip.name}</Text>
-              <Text style={styles.destination}>{trip.destination}</Text>
-              <Text style={styles.dates}>
-                {trip.start_date} — {trip.end_date}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />
+          }
+        >
+          {trips.length === 0 ? (
+            <Text style={styles.emptyText}>Nessun viaggio ancora.</Text>
+          ) : (
+            trips.map((trip) => (
+              <TouchableOpacity
+                key={trip.id}
+                style={styles.card}
+                onPress={() => navigation.navigate('TripOverview', { tripId: trip.id })}
+              >
+                <Text style={styles.name}>{trip.name}</Text>
+                <Text style={styles.destination}>{trip.destination}</Text>
+                <Text style={styles.dates}>
+                  {trip.start_date} — {trip.end_date}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
       )}
     </View>

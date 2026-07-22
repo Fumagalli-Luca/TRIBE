@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bell } from 'lucide-react-native';
@@ -77,6 +77,7 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [heroMembers, setHeroMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadAll);
@@ -84,6 +85,12 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -181,7 +188,13 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />
+          }
+        >
           {hero && (
             <>
               <Text style={styles.sectionTitle}>
