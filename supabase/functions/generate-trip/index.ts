@@ -2,7 +2,8 @@
 // Riferimento spec: §6.3 (Data flow) + §7.1 (Trip Generator AI)
 //
 // Env richieste:
-// - SUPABASE_URL, SUPABASE_ANON_KEY -> fornite automaticamente da Supabase
+// - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY -> fornite
+//   automaticamente da Supabase
 // - OPENAI_API_KEY -> da impostare manualmente:
 //     supabase secrets set OPENAI_API_KEY=sk-...
 //   oppure da Dashboard -> Edge Functions -> Secrets
@@ -222,14 +223,19 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Client "identità": solo per verificare CHI sta chiamando, tramite il
+    // suo JWT. Non viene usato per scrivere dati.
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
     });
 
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    } = await supabaseAuth.auth.getUser();
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Utente non valido' }), {
@@ -237,6 +243,12 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Client "dati": service role, bypassa le RLS. Sicuro qui perché l'identità
+    // dell'utente è già stata verificata sopra e ogni riga scritta viene
+    // esplicitamente legata a user.id nel codice sottostante (mai a un valore
+    // arbitrario fornito dal client).
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const body = await req.json();
     if (!validateInput(body)) {
