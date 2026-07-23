@@ -28,6 +28,7 @@ export interface User {
   email: string;
   phone: string | null;
   onboarding_completed: boolean;
+  push_token: string | null;
   created_at: string;
   updated_at: string;
 }

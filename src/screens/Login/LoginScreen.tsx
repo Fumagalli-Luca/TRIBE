@@ -153,8 +153,13 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Text style={styles.terms}>
           Continuando accetti i{' '}
-          <Text style={styles.termsLink}>Termini di servizio</Text> e la{' '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>
+          <Text style={styles.termsLink} onPress={() => navigation.navigate('Legal', { kind: 'terms' })}>
+            Termini di servizio
+          </Text>{' '}
+          e la{' '}
+          <Text style={styles.termsLink} onPress={() => navigation.navigate('Legal', { kind: 'privacy' })}>
+            Privacy Policy
+          </Text>
         </Text>
       </ScrollView>
       </KeyboardAvoidingView>

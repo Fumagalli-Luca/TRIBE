@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Settings } from 'lucide-react-native';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
@@ -37,6 +38,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [openVotesCount, setOpenVotesCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('itinerario');
 
@@ -70,6 +72,19 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       .eq('trip_id', tripId)
       .eq('status', 'open');
     setOpenVotesCount(count ?? 0);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: myMembership } = await supabase
+        .from('trip_members')
+        .select('role')
+        .eq('trip_id', tripId)
+        .eq('user_id', user.id)
+        .single();
+      setIsAdmin((myMembership as { role: string } | null)?.role === 'admin');
+    }
 
     setLoading(false);
   }
@@ -115,7 +130,16 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
             {trip.start_date} — {trip.end_date}
           </Text>
         </View>
-        <View style={{ width: 24 }} />
+        {isAdmin ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TripSettings', { tripId })}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          >
+            <Settings size={22} color={colors.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
 
       {members.length > 0 && (

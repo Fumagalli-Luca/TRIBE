@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { isBiometricAvailable, authenticateBiometric } from '../lib/biometrics';
+import { registerForPushNotifications } from '../lib/pushNotifications';
 import {
   getBiometricEnabled,
   setBiometricEnabled,
@@ -26,6 +27,8 @@ import AILoadingScreen from '../screens/CreateTrip/AILoadingScreen';
 import TripOverviewScreen from '../screens/TripOverview/TripOverviewScreen';
 import JoinTripScreen from '../screens/JoinTrip/JoinTripScreen';
 import VotingScreen from '../screens/Voting/VotingScreen';
+import TripSettingsScreen from '../screens/TripSettings/TripSettingsScreen';
+import LegalScreen from '../screens/Legal/LegalScreen';
 import AppLockScreen from '../screens/AppLock/AppLockScreen';
 import type { TripGeneratorPayload } from '../types/tripGenerator';
 
@@ -40,6 +43,7 @@ export interface PendingProfileData {
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  Legal: { kind: 'terms' | 'privacy' };
   VerifyEmail: { email: string; mode: 'signup' | 'reconfirm'; pendingProfile?: PendingProfileData };
   ForgotPassword: undefined;
   Onboarding: undefined;
@@ -50,6 +54,7 @@ export type RootStackParamList = {
   CreateTrip: undefined;
   AILoading: { payload: TripGeneratorPayload };
   TripOverview: { tripId: string };
+  TripSettings: { tripId: string };
   JoinTrip: undefined;
   Voting: { tripId: string; voteId?: string };
 };
@@ -120,6 +125,7 @@ export default function RootNavigator() {
 
       if (data.session) {
         fetchProfile(data.session.user.id);
+        registerForPushNotifications();
 
         const enabled = await getBiometricEnabled();
         if (enabled) {
@@ -136,6 +142,7 @@ export default function RootNavigator() {
 
       if (newSession) {
         fetchProfile(newSession.user.id);
+        registerForPushNotifications();
 
         // Dopo un login/registrazione appena fatti (non un semplice
         // ripristino sessione all'avvio), proponiamo Face ID una sola
@@ -186,6 +193,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="Legal" component={LegalScreen} />
           </>
         ) : !profile?.onboarding_completed ? (
           <>
@@ -201,6 +209,7 @@ export default function RootNavigator() {
             />
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
+            <Stack.Screen name="TripSettings" component={TripSettingsScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
             <Stack.Screen name="Voting" component={VotingScreen} />
           </>
@@ -217,6 +226,7 @@ export default function RootNavigator() {
             />
             <Stack.Screen name="AILoading" component={AILoadingScreen} />
             <Stack.Screen name="TripOverview" component={TripOverviewScreen} />
+            <Stack.Screen name="TripSettings" component={TripSettingsScreen} />
             <Stack.Screen name="JoinTrip" component={JoinTripScreen} />
             <Stack.Screen name="Voting" component={VotingScreen} />
           </>

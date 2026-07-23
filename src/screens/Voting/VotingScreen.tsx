@@ -16,6 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { notifyTrip } from '../../lib/sendPush';
 import SwipeCard from '../../components/SwipeCard';
 import Chip from '../../components/Chip';
 import GradientButton from '../../components/GradientButton';
@@ -199,6 +200,7 @@ export default function VotingScreen({ route, navigation }: Props) {
       content: `Il gruppo ha scelto ${winner.name}! ${winnerYes} voti positivi su ${totalCast || winnerYes}.`,
     });
 
+    notifyTrip(tripId, 'Voto chiuso', `Il gruppo ha scelto ${winner.name}!`);
     hapticSuccess();
     setClosing(false);
     await load();
@@ -249,6 +251,7 @@ export default function VotingScreen({ route, navigation }: Props) {
         metadata: { vote_id: (newVote as Vote).id },
       });
 
+      notifyTrip(tripId, 'Nuovo voto', (newVote as Vote).title);
       setCreateModalVisible(false);
       setNewTitle('');
       setNewOptions([{ name: '', price: '' }, { name: '', price: '' }]);
