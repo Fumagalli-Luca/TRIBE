@@ -81,7 +81,7 @@ export default function BudgetTab({ tripId }: Props) {
 
     const { data: memberRows } = await supabase
       .from('trip_members')
-      .select('user_id, status, user:users(full_name)')
+      .select('user_id, status, user:users!trip_members_user_id_fkey(full_name)')
       .eq('trip_id', tripId)
       .eq('status', 'accepted');
 

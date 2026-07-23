@@ -136,7 +136,7 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
     if (hero) {
       const { data: rows } = await supabase
         .from('trip_members')
-        .select('user:users(full_name, avatar_url)')
+        .select('user:users!trip_members_user_id_fkey(full_name, avatar_url)')
         .eq('trip_id', hero.id)
         .eq('status', 'accepted');
       setHeroMembers(

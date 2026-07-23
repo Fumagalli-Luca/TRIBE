@@ -63,7 +63,7 @@ export default function GroupTab({ tripId, navigation }: Props) {
 
     const { data: memberRows } = await supabase
       .from('trip_members')
-      .select('id, user_id, role, status, user:users(full_name, avatar_url)')
+      .select('id, user_id, role, status, user:users!trip_members_user_id_fkey(full_name, avatar_url)')
       .eq('trip_id', tripId);
     const memberList = (memberRows as unknown as Member[]) ?? [];
     setMembers(memberList);

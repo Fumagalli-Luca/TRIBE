@@ -63,7 +63,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
     const { data: memberRows } = await supabase
       .from('trip_members')
-      .select('user:users(full_name, avatar_url)')
+      .select('user:users!trip_members_user_id_fkey(full_name, avatar_url)')
       .eq('trip_id', tripId)
       .eq('status', 'accepted');
     const memberList = ((memberRows as unknown as { user: Member | null }[]) ?? [])
