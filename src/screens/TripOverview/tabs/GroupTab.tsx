@@ -84,10 +84,20 @@ export default function GroupTab({ tripId, navigation, onChanged }: Props) {
       splits = (splitRows as { user_id: string; amount_owed: number }[]) ?? [];
     }
 
+    const { data: settlementRows } = await supabase
+      .from('settlements')
+      .select('from_user, to_user, amount')
+      .eq('trip_id', tripId);
+    const settlements = (settlementRows as { from_user: string; to_user: string; amount: number }[]) ?? [];
+
     const net = new Map<string, number>();
     for (const m of memberList) net.set(m.user_id, 0);
     for (const e of expenses) net.set(e.paid_by, (net.get(e.paid_by) ?? 0) + Number(e.amount));
     for (const s of splits) net.set(s.user_id, (net.get(s.user_id) ?? 0) - Number(s.amount_owed));
+    for (const s of settlements) {
+      net.set(s.from_user, (net.get(s.from_user) ?? 0) + Number(s.amount));
+      net.set(s.to_user, (net.get(s.to_user) ?? 0) - Number(s.amount));
+    }
     setBalances(net);
 
     setLoading(false);
