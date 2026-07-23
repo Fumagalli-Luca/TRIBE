@@ -22,6 +22,7 @@ import type { Expense, ExpenseCategory, ExpenseSplit, Settlement } from '../../.
 
 interface Props {
   tripId: string;
+  onChanged?: () => void;
 }
 
 interface MemberRow {
@@ -42,7 +43,7 @@ function formatAmount(n: number, currency: string): string {
   return `${n.toFixed(2)}${symbol}`;
 }
 
-export default function BudgetTab({ tripId }: Props) {
+export default function BudgetTab({ tripId, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('EUR');
   const [budgetTotal, setBudgetTotal] = useState<number | null>(null);
@@ -159,6 +160,7 @@ export default function BudgetTab({ tripId }: Props) {
     });
     hapticSuccess();
     await load();
+    onChanged?.();
     setSettling(null);
   }
 
@@ -228,6 +230,7 @@ export default function BudgetTab({ tripId }: Props) {
       setCategory('other');
       setModalVisible(false);
       await load();
+      onChanged?.();
     }
     setSaving(false);
   }

@@ -13,6 +13,7 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 interface Props {
   tripId: string;
   navigation: NativeStackNavigationProp<RootStackParamList, 'TripOverview'>;
+  onChanged?: () => void;
 }
 
 interface Member {
@@ -32,7 +33,7 @@ function formatAmount(n: number, currency: string): string {
   return `${sign}${Math.abs(n).toFixed(2)}${symbol}`;
 }
 
-export default function GroupTab({ tripId, navigation }: Props) {
+export default function GroupTab({ tripId, navigation, onChanged }: Props) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [balances, setBalances] = useState<Map<string, number>>(new Map());
@@ -112,6 +113,7 @@ export default function GroupTab({ tripId, navigation }: Props) {
             await supabase.from('trip_members').delete().eq('id', member.id);
             hapticSelect();
             setMembers((prev) => prev.filter((m) => m.id !== member.id));
+            onChanged?.();
           },
         },
       ]

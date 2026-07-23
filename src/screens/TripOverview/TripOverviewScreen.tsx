@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Settings } from 'lucide-react-native';
+import { Settings, Sparkles, X } from 'lucide-react-native';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
@@ -18,7 +18,7 @@ import AssistantTab from './tabs/AssistantTab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TripOverview'>;
 
-type TabKey = 'itinerario' | 'budget' | 'gruppo' | 'chat' | 'checklist' | 'assistente';
+type TabKey = 'itinerario' | 'budget' | 'gruppo' | 'chat' | 'checklist';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'itinerario', label: 'Itinerario' },
@@ -26,7 +26,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'gruppo', label: 'Gruppo' },
   { key: 'chat', label: 'Chat' },
   { key: 'checklist', label: 'Checklist' },
-  { key: 'assistente', label: 'AI' },
 ];
 
 interface Member {
@@ -44,6 +43,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('itinerario');
+  const [assistantVisible, setAssistantVisible] = useState(false);
 
   useEffect(() => {
     loadTrip();
@@ -55,6 +55,16 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
   async function refreshTripInfo() {
     const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
     if (data) setTrip(data as Trip);
+
+    const { data: memberRows } = await supabase
+      .from('trip_members')
+      .select('user:users!trip_members_user_id_fkey(full_name, avatar_url)')
+      .eq('trip_id', tripId)
+      .eq('status', 'accepted');
+    const memberList = ((memberRows as unknown as { user: Member | null }[]) ?? [])
+      .filter((r) => r.user)
+      .map((r) => r.user!);
+    setMembers(memberList);
 
     const { data: expenseRows } = await supabase.from('expenses').select('amount').eq('trip_id', tripId);
     setTotalSpent(((expenseRows as { amount: number }[]) ?? []).reduce((sum, e) => sum + Number(e.amount), 0));
@@ -69,20 +79,6 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   async function loadTrip() {
     setLoading(true);
-
-    const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
-    const tripRow = data as Trip | null;
-    setTrip(tripRow);
-
-    const { data: memberRows } = await supabase
-      .from('trip_members')
-      .select('user:users!trip_members_user_id_fkey(full_name, avatar_url)')
-      .eq('trip_id', tripId)
-      .eq('status', 'accepted');
-    const memberList = ((memberRows as unknown as { user: Member | null }[]) ?? [])
-      .filter((r) => r.user)
-      .map((r) => r.user!);
-    setMembers(memberList);
 
     await refreshTripInfo();
 
@@ -225,25 +221,69 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
       {activeTab === 'chat' ? (
         <ChatTab tripId={tripId} navigation={navigation} />
-      ) : activeTab === 'assistente' ? (
-        <AssistantTab tripId={tripId} />
       ) : activeTab === 'itinerario' ? (
         // Gestisce da sé lo scroll (DraggableFlatList per il drag-to-reorder):
         // non va annidato in un altro ScrollView.
         <ItinerarioTab tripId={tripId} />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          {activeTab === 'budget' && <BudgetTab tripId={tripId} />}
-          {activeTab === 'gruppo' && <GroupTab tripId={tripId} navigation={navigation} />}
+          {activeTab === 'budget' && <BudgetTab tripId={tripId} onChanged={refreshTripInfo} />}
+          {activeTab === 'gruppo' && <GroupTab tripId={tripId} navigation={navigation} onChanged={refreshTripInfo} />}
           {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
         </ScrollView>
       )}
+
+      {activeTab !== 'chat' && (
+        <TouchableOpacity
+          style={[styles.assistantFab, { bottom: insets.bottom + spacing.lg }]}
+          onPress={() => setAssistantVisible(true)}
+        >
+          <Sparkles size={24} color={colors.text} />
+        </TouchableOpacity>
+      )}
+
+      <Modal visible={assistantVisible} animationType="slide" onRequestClose={() => setAssistantVisible(false)}>
+        <View style={[styles.flex, { paddingTop: insets.top }]}>
+          <View style={styles.assistantHeader}>
+            <Text style={styles.assistantHeaderTitle}>✨ Assistente TRIBE</Text>
+            <TouchableOpacity onPress={() => setAssistantVisible(false)} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}>
+              <X size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <AssistantTab tripId={tripId} />
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
+  assistantFab: {
+    position: 'absolute',
+    left: spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  assistantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  assistantHeaderTitle: { ...typography.h2, color: colors.text },
   centered: {
     flex: 1,
     backgroundColor: colors.background,

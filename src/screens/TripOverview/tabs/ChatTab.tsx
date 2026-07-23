@@ -53,6 +53,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
   const [aiThinking, setAiThinking] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -111,11 +112,46 @@ export default function ChatTab({ tripId, navigation }: Props) {
     setLoading(false);
   }
 
+  function handleDraftChange(text: string) {
+    setDraft(text);
+    const lastAt = text.lastIndexOf('@');
+    if (lastAt === -1) {
+      setMentionQuery(null);
+      return;
+    }
+    const tail = text.slice(lastAt + 1);
+    if (tail.includes('\n')) {
+      setMentionQuery(null);
+      return;
+    }
+    setMentionQuery(tail.toLowerCase());
+  }
+
+  function mentionSuggestions() {
+    if (mentionQuery === null) return [];
+    const all = [
+      { id: 'tribe', label: 'TRIBE AI' },
+      ...Array.from(memberNames.entries())
+        .filter(([id]) => id !== userId)
+        .map(([id, name]) => ({ id, label: name })),
+    ];
+    return all.filter((m) => m.label.toLowerCase().includes(mentionQuery)).slice(0, 5);
+  }
+
+  function selectMention(label: string) {
+    const lastAt = draft.lastIndexOf('@');
+    if (lastAt === -1) return;
+    const mentionText = label === 'TRIBE AI' ? 'tribe' : label;
+    setDraft(draft.slice(0, lastAt) + `@${mentionText} `);
+    setMentionQuery(null);
+  }
+
   async function handleSend() {
     if (!draft.trim() || sending || !userId) return;
     setSending(true);
     const content = draft.trim();
     setDraft('');
+    setMentionQuery(null);
 
     const { data } = await supabase
       .from('chat_messages')
@@ -332,7 +368,15 @@ export default function ChatTab({ tripId, navigation }: Props) {
         </Animated.View>
       )}
 
-      <Text style={styles.aiHint}>Suggerimento: scrivi @tribe seguito da una domanda per chiedere all'AI del viaggio</Text>
+      {mentionQuery !== null && mentionSuggestions().length > 0 && (
+        <Animated.View entering={FadeInUp.duration(150)} style={styles.mentionList}>
+          {mentionSuggestions().map((s) => (
+            <TouchableOpacity key={s.id} style={styles.mentionItem} onPress={() => selectMention(s.label)}>
+              <Text style={styles.mentionItemText}>{s.id === 'tribe' ? '✨ ' : '👤 '}{s.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
+      )}
 
       <View style={styles.inputRow}>
         <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={uploadingImage}>
@@ -347,7 +391,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
           placeholder="Scrivi un messaggio..."
           placeholderTextColor={colors.textMuted}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={handleDraftChange}
           multiline
         />
         <TouchableOpacity
@@ -418,13 +462,22 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   aiThinkingText: { ...typography.caption, color: colors.textMuted },
-  aiHint: {
-    ...typography.caption,
-    color: colors.textMuted,
-    opacity: 0.6,
-    paddingHorizontal: spacing.md,
-    paddingBottom: 4,
+  mentionList: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
+  mentionItem: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  mentionItemText: { ...typography.body, color: colors.text },
   messageImage: { width: 200, height: 200, borderRadius: radius.buttonPrimary },
   messageText: { ...typography.body, color: colors.text },
   messageTime: { ...typography.caption, color: colors.textMuted, marginTop: 2, alignSelf: 'flex-end' },
