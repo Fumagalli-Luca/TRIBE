@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -145,7 +148,20 @@ export default function BudgetTab({ tripId }: Props) {
 
   async function handleAdd() {
     const amountValue = Number(amount.replace(',', '.'));
-    if (!description.trim() || !amountValue || amountValue <= 0 || !paidBy || participants.size === 0) {
+    if (!description.trim()) {
+      Alert.alert('Manca la descrizione', 'Inserisci una descrizione per la spesa.');
+      return;
+    }
+    if (!amountValue || amountValue <= 0) {
+      Alert.alert('Importo non valido', 'Inserisci un importo maggiore di zero.');
+      return;
+    }
+    if (!paidBy) {
+      Alert.alert('Manca chi ha pagato', 'Seleziona chi ha pagato questa spesa.');
+      return;
+    }
+    if (participants.size === 0) {
+      Alert.alert('Manca tra chi dividere', 'Seleziona almeno una persona tra cui dividere la spesa.');
       return;
     }
     setSaving(true);
@@ -269,7 +285,10 @@ export default function BudgetTab({ tripId }: Props) {
       <GradientButton label="+ Aggiungi spesa" onPress={() => setModalVisible(true)} />
 
       <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nuova spesa</Text>
             <TextInput
@@ -347,7 +366,7 @@ export default function BudgetTab({ tripId }: Props) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

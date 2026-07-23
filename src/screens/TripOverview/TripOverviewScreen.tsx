@@ -44,7 +44,15 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     loadTrip();
-  }, [tripId]);
+    const unsubscribe = navigation.addListener('focus', refreshTripInfo);
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId, navigation]);
+
+  async function refreshTripInfo() {
+    const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
+    if (data) setTrip(data as Trip);
+  }
 
   async function loadTrip() {
     setLoading(true);

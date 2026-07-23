@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -398,7 +400,10 @@ export default function VotingScreen({ route, navigation }: Props) {
   function renderCreateModal() {
     return (
       <Modal visible={createModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nuovo voto</Text>
             <TextInput
@@ -451,7 +456,7 @@ export default function VotingScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     );
   }

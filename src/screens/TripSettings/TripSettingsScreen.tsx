@@ -86,7 +86,7 @@ export default function TripSettingsScreen({ route, navigation }: Props) {
       return;
     }
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    navigation.goBack();
   }
 
   function handleDelete() {

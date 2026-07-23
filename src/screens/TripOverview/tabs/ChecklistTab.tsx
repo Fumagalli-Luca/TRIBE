@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -156,7 +158,10 @@ export default function ChecklistTab({ tripId }: Props) {
       <GradientButton label="+ Aggiungi item" onPress={() => setModalVisible(true)} />
 
       <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nuovo elemento</Text>
             <TextInput
@@ -212,7 +217,7 @@ export default function ChecklistTab({ tripId }: Props) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

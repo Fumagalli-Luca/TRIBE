@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -48,6 +49,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -59,7 +61,8 @@ export default function ChatTab({ tripId, navigation }: Props) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `trip_id=eq.${tripId}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as ChatMessage]);
+          const incoming = payload.new as ChatMessage;
+          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
         }
       )
       .on(
@@ -100,12 +103,12 @@ export default function ChatTab({ tripId, navigation }: Props) {
     const content = draft.trim();
     setDraft('');
 
-    await supabase.from('chat_messages').insert({
-      trip_id: tripId,
-      sender_id: userId,
-      type: 'text',
-      content,
-    });
+    const { data } = await supabase
+      .from('chat_messages')
+      .insert({ trip_id: tripId, sender_id: userId, type: 'text', content })
+      .select()
+      .single();
+    if (data) setMessages((prev) => [...prev, data as ChatMessage]);
     setSending(false);
     notifyTrip(tripId, 'Nuovo messaggio', content);
   }
@@ -135,12 +138,12 @@ export default function ChatTab({ tripId, navigation }: Props) {
 
       const { data: publicUrlData } = supabase.storage.from('chat-media').getPublicUrl(path);
 
-      await supabase.from('chat_messages').insert({
-        trip_id: tripId,
-        sender_id: userId,
-        type: 'image',
-        content: publicUrlData.publicUrl,
-      });
+      const { data } = await supabase
+        .from('chat_messages')
+        .insert({ trip_id: tripId, sender_id: userId, type: 'image', content: publicUrlData.publicUrl })
+        .select()
+        .single();
+      if (data) setMessages((prev) => [...prev, data as ChatMessage]);
       notifyTrip(tripId, 'Nuova foto', 'Foto condivisa nella chat');
     } catch {
       // Upload fallito silenziosamente: la chat resta usabile senza bloccare l'utente.
@@ -221,6 +224,9 @@ export default function ChatTab({ tripId, navigation }: Props) {
             >
               <TouchableOpacity
                 activeOpacity={0.85}
+                onPress={() => {
+                  if (item.type === 'image' && item.content) setViewerImage(item.content);
+                }}
                 onLongPress={() => setReactionPickerFor((prev) => (prev === item.id ? null : item.id))}
                 style={[styles.messageBubble, isMine ? styles.messageBubbleMine : styles.messageBubbleOther]}
               >
@@ -283,6 +289,18 @@ export default function ChatTab({ tripId, navigation }: Props) {
           <Text style={styles.sendButtonText}>Invia</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={!!viewerImage} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.viewerOverlay}
+          activeOpacity={1}
+          onPress={() => setViewerImage(null)}
+        >
+          {viewerImage && (
+            <Image source={{ uri: viewerImage }} style={styles.viewerImage} resizeMode="contain" />
+          )}
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -343,6 +361,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   reactionChipText: { ...typography.caption, color: colors.text },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerImage: { width: '100%', height: '80%' },
   attachButton: {
     width: 44,
     height: 44,

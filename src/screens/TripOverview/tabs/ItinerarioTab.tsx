@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -55,6 +55,7 @@ export default function ItinerarioTab({ tripId }: Props) {
   const [duration, setDuration] = useState('');
   const [locationName, setLocationName] = useState('');
   const [saving, setSaving] = useState(false);
+  const swipeRefs = useRef<Record<string, Swipeable | null>>({});
 
   useEffect(() => {
     load();
@@ -129,6 +130,7 @@ export default function ItinerarioTab({ tripId }: Props) {
 
   async function handleConfirmActivity(activity: ItineraryActivity) {
     hapticImpact();
+    swipeRefs.current[activity.id]?.close();
     setActivities((prev) =>
       prev.map((a) => (a.id === activity.id ? { ...a, status: 'confirmed' } : a))
     );
@@ -137,6 +139,7 @@ export default function ItinerarioTab({ tripId }: Props) {
 
   async function handleRemoveActivity(activity: ItineraryActivity) {
     hapticImpact();
+    swipeRefs.current[activity.id]?.close();
     setActivities((prev) =>
       prev.map((a) => (a.id === activity.id ? { ...a, status: 'removed' } : a))
     );
@@ -217,6 +220,9 @@ export default function ItinerarioTab({ tripId }: Props) {
     const index = getIndex() ?? 0;
     return (
       <Swipeable
+        ref={(instance) => {
+          swipeRefs.current[a.id] = instance;
+        }}
         renderLeftActions={() => (
           <TouchableOpacity
             style={[styles.swipeAction, styles.swipeActionConfirm]}
@@ -251,8 +257,8 @@ export default function ItinerarioTab({ tripId }: Props) {
                 {a.location_name ? ` · ${a.location_name}` : ''}
               </Text>
               <View style={styles.tagRow}>
-                <Text style={[styles.tag, a.source === 'ai' ? styles.tagAi : styles.tagConfirmed]}>
-                  {a.source === 'ai' ? 'AI suggerito' : 'Confermato'}
+                <Text style={[styles.tag, a.status === 'confirmed' ? styles.tagConfirmed : styles.tagAi]}>
+                  {a.status === 'confirmed' ? '✓ Confermato' : a.source === 'ai' ? 'AI suggerito' : 'Manuale'}
                 </Text>
               </View>
             </View>
