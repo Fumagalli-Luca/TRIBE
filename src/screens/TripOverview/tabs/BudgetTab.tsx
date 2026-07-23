@@ -151,17 +151,23 @@ export default function BudgetTab({ tripId, onChanged }: Props) {
 
   async function handleSettle(fromUserId: string, toUserId: string, transactionAmount: number) {
     setSettling(`${fromUserId}-${toUserId}`);
-    await supabase.from('settlements').insert({
+    const { error } = await supabase.from('settlements').insert({
       trip_id: tripId,
       from_user: fromUserId,
       to_user: toUserId,
       amount: transactionAmount,
       currency,
     });
+    setSettling(null);
+
+    if (error) {
+      Alert.alert('Non riuscito', `Non siamo riusciti a registrare il pagamento (${error.message}).`);
+      return;
+    }
+
     hapticSuccess();
     await load();
     onChanged?.();
-    setSettling(null);
   }
 
   const rawRatio = budgetTotal ? totalSpent / budgetTotal : 0;

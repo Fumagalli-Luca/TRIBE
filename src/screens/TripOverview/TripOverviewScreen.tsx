@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   assistantFab: {
     position: 'absolute',
-    left: spacing.lg,
+    right: spacing.lg,
     width: 56,
     height: 56,
     borderRadius: 28,
