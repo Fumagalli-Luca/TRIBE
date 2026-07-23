@@ -7,6 +7,7 @@ import { Settings, Sparkles, X } from 'lucide-react-native';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { todayAsUtcMidnight } from '../../lib/dates';
 import type { Trip } from '../../types/database';
 import AvatarStack from '../../components/AvatarStack';
 import ItinerarioTab from './tabs/ItinerarioTab';
@@ -61,9 +62,11 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       .select('user:users!trip_members_user_id_fkey(full_name, avatar_url)')
       .eq('trip_id', tripId)
       .eq('status', 'accepted');
-    const memberList = ((memberRows as unknown as { user: Member | null }[]) ?? [])
+    const memberList = (
+      (memberRows as unknown as { user: { full_name: string | null; avatar_url: string | null } | null }[]) ?? []
+    )
       .filter((r) => r.user)
-      .map((r) => r.user!);
+      .map((r) => ({ name: r.user!.full_name, avatarUrl: r.user!.avatar_url }));
     setMembers(memberList);
 
     const { data: expenseRows } = await supabase.from('expenses').select('amount').eq('trip_id', tripId);
@@ -117,8 +120,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
     );
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayAsUtcMidnight();
   const startDate = new Date(trip.start_date);
   const endDate = new Date(trip.end_date);
   const msPerDay = 1000 * 60 * 60 * 24;

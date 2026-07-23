@@ -6,6 +6,7 @@ import { Bell } from 'lucide-react-native';
 import type { HomeNavigationProp } from '../../navigation/RootNavigator';
 import { colors, gradients, radius, spacing, typography } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { todayAsUtcMidnight } from '../../lib/dates';
 import Avatar from '../../components/Avatar';
 import AvatarStack from '../../components/AvatarStack';
 import GradientButton from '../../components/GradientButton';
@@ -126,8 +127,7 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
     setTrips(tripList);
     setLoading(false);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayAsUtcMidnight();
     const hero =
       tripList.find((t) => classify(t, today) === 'ongoing') ??
       tripList.find((t) => classify(t, today) === 'upcoming') ??
@@ -149,8 +149,7 @@ export default function DashboardTab({ navigation, onOpenNotifications, onOpenPr
     }
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayAsUtcMidnight();
 
   const ongoing = trips.filter((t) => classify(t, today) === 'ongoing');
   const upcoming = trips.filter((t) => classify(t, today) === 'upcoming');
