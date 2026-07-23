@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, spacing, typography } from '../../constants/theme';
@@ -29,6 +30,7 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [slideIndex, setSlideIndex] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +62,7 @@ export default function OnboardingScreen({ navigation }: Props) {
     <View style={styles.container}>
       <AnimatedBackground />
       <TouchableOpacity
-        style={styles.skipButton}
+        style={[styles.skipButton, { top: insets.top + spacing.sm }]}
         onPress={completeOnboarding}
         disabled={saving}
         hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}

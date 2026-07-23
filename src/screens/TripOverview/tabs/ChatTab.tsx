@@ -50,6 +50,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -94,6 +95,17 @@ export default function ChatTab({ tripId, navigation }: Props) {
       .eq('trip_id', tripId)
       .order('created_at', { ascending: true });
     setMessages((data as ChatMessage[]) ?? []);
+
+    const { data: memberRows } = await supabase
+      .from('trip_members')
+      .select('user_id, user:users!trip_members_user_id_fkey(full_name)')
+      .eq('trip_id', tripId);
+    const names = new Map<string, string>();
+    for (const m of (memberRows as unknown as { user_id: string; user: { full_name: string | null } | null }[]) ?? []) {
+      names.set(m.user_id, m.user?.full_name ?? 'Utente');
+    }
+    setMemberNames(names);
+
     setLoading(false);
   }
 
@@ -222,6 +234,9 @@ export default function ChatTab({ tripId, navigation }: Props) {
               entering={FadeInUp.duration(220)}
               style={[styles.messageWrap, isMine ? styles.messageWrapMine : styles.messageWrapOther]}
             >
+              {!isMine && item.sender_id && (
+                <Text style={styles.senderName}>{memberNames.get(item.sender_id) ?? 'Utente'}</Text>
+              )}
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => {
@@ -333,6 +348,7 @@ const styles = StyleSheet.create({
   messageWrap: { maxWidth: '80%', marginVertical: 2 },
   messageWrapMine: { alignSelf: 'flex-end' },
   messageWrapOther: { alignSelf: 'flex-start' },
+  senderName: { ...typography.caption, color: colors.textMuted, marginBottom: 2, marginLeft: spacing.xs },
   messageBubble: {
     borderRadius: radius.card,
     padding: spacing.sm,

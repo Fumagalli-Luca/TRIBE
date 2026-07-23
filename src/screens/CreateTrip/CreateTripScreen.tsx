@@ -20,6 +20,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../constants/theme';
@@ -106,6 +107,7 @@ function TypingIndicator() {
 }
 
 export default function CreateTripScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('destination');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'q1', from: 'ai', text: 'Dove vi va di andare? 🌍' },
@@ -204,7 +206,7 @@ export default function CreateTripScreen({ navigation }: Props) {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}

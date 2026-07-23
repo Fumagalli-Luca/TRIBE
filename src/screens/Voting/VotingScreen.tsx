@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -57,6 +57,7 @@ export default function VotingScreen({ route, navigation }: Props) {
     { name: '', price: '' },
   ]);
   const [creating, setCreating] = useState(false);
+  const resolvedVoteId = useRef<string | null>(voteId ?? null);
 
   useEffect(() => {
     load();
@@ -89,8 +90,8 @@ export default function VotingScreen({ route, navigation }: Props) {
     }
 
     let voteRow: Vote | null = null;
-    if (voteId) {
-      const { data } = await supabase.from('votes').select('*').eq('id', voteId).single();
+    if (resolvedVoteId.current) {
+      const { data } = await supabase.from('votes').select('*').eq('id', resolvedVoteId.current).single();
       voteRow = data as Vote | null;
     } else {
       const { data } = await supabase
@@ -102,6 +103,7 @@ export default function VotingScreen({ route, navigation }: Props) {
         .limit(1)
         .maybeSingle();
       voteRow = data as Vote | null;
+      if (voteRow) resolvedVoteId.current = voteRow.id;
     }
     setVote(voteRow);
 
@@ -348,13 +350,16 @@ export default function VotingScreen({ route, navigation }: Props) {
   }
 
   const option = vote.options[currentIndex];
+  const CATEGORY_EMOJI: Record<string, string> = { hotel: '🏨', activity: '🎟️', restaurant: '🍽️' };
+  const categoryEmoji = CATEGORY_EMOJI[vote.category ?? ''] ?? '📍';
 
   return (
     <View style={styles.flex}>
       {header}
       <Text style={styles.counterText}>
-        {votersCompleted}/{totalMembers} hanno votato
+        Opzione {currentIndex + 1} di {vote.options.length} · {votersCompleted}/{totalMembers} hanno votato
       </Text>
+      <Text style={styles.hintText}>❌ non mi piace · ❤️ mi piace — scorri la card o usa i pulsanti sotto</Text>
 
       <View style={styles.cardArea}>
         <SwipeCard
@@ -364,7 +369,7 @@ export default function VotingScreen({ route, navigation }: Props) {
         >
           <View style={styles.optionCard}>
             <View style={styles.optionImagePlaceholder}>
-              <Text style={styles.optionImageEmoji}>🏨</Text>
+              <Text style={styles.optionImageEmoji}>{categoryEmoji}</Text>
             </View>
             <View style={styles.optionInfo}>
               <Text style={styles.optionName}>{option.name}</Text>
@@ -392,7 +397,7 @@ export default function VotingScreen({ route, navigation }: Props) {
       </View>
 
       <TouchableOpacity style={styles.skipLink} onPress={() => setCurrentIndex((i) => i + 1)}>
-        <Text style={styles.skipText}>Salta</Text>
+        <Text style={styles.skipText}>Salta questa opzione</Text>
       </TouchableOpacity>
     </View>
   );
@@ -475,7 +480,8 @@ const styles = StyleSheet.create({
   },
   backText: { ...typography.h1, color: colors.text },
   headerTitle: { ...typography.h2, color: colors.text },
-  counterText: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.sm },
+  counterText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  hintText: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: 2, marginBottom: spacing.sm, opacity: 0.7 },
   cardArea: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   optionCard: {
     width: '100%',

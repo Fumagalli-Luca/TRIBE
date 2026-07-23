@@ -18,7 +18,7 @@ import ProgressRing from '../../../components/ProgressRing';
 import GradientButton from '../../../components/GradientButton';
 import { hapticSuccess } from '../../../lib/haptics';
 import { useCountUp } from '../../../lib/useCountUp';
-import type { Expense, ExpenseCategory, ExpenseSplit } from '../../../types/database';
+import type { Expense, ExpenseCategory, ExpenseSplit, Settlement } from '../../../types/database';
 
 interface Props {
   tripId: string;
@@ -49,7 +49,9 @@ export default function BudgetTab({ tripId }: Props) {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [splits, setSplits] = useState<ExpenseSplit[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [settling, setSettling] = useState<string | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [description, setDescription] = useState('');
@@ -114,6 +116,12 @@ export default function BudgetTab({ tripId }: Props) {
       setSplits([]);
     }
 
+    const { data: settlementRows } = await supabase
+      .from('settlements')
+      .select('*')
+      .eq('trip_id', tripId);
+    setSettlements((settlementRows as Settlement[]) ?? []);
+
     setLoading(false);
   }
 
@@ -128,11 +136,31 @@ export default function BudgetTab({ tripId }: Props) {
       const owed = splits
         .filter((s) => s.user_id === m.userId)
         .reduce((sum, s) => sum + Number(s.amount_owed), 0);
-      return { userId: m.userId, name: m.name, net: paid - owed };
+      const settledAsDebtor = settlements
+        .filter((s) => s.from_user === m.userId)
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      const settledAsCreditor = settlements
+        .filter((s) => s.to_user === m.userId)
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      return { userId: m.userId, name: m.name, net: paid - owed + settledAsDebtor - settledAsCreditor };
     });
-  }, [members, expenses, splits]);
+  }, [members, expenses, splits, settlements]);
 
   const transactions = useMemo(() => simplifyDebts(balances), [balances]);
+
+  async function handleSettle(fromUserId: string, toUserId: string, transactionAmount: number) {
+    setSettling(`${fromUserId}-${toUserId}`);
+    await supabase.from('settlements').insert({
+      trip_id: tripId,
+      from_user: fromUserId,
+      to_user: toUserId,
+      amount: transactionAmount,
+      currency,
+    });
+    hapticSuccess();
+    await load();
+    setSettling(null);
+  }
 
   const progressRatio = budgetTotal ? Math.min(1, totalSpent / budgetTotal) : 0;
   const overBudget = budgetTotal !== null && totalSpent > budgetTotal;
@@ -250,13 +278,23 @@ export default function BudgetTab({ tripId }: Props) {
         {transactions.length === 0 ? (
           <Text style={styles.emptyText}>Il gruppo è in pari.</Text>
         ) : (
-          transactions.map((t, i) => (
-            <View key={i} style={styles.balanceRow}>
-              <Text style={styles.balanceText}>
-                {t.fromName} deve {formatAmount(t.amount, currency)} a {t.toName}
-              </Text>
-            </View>
-          ))
+          transactions.map((t, i) => {
+            const key = `${t.fromUserId}-${t.toUserId}`;
+            return (
+              <View key={i} style={styles.balanceRow}>
+                <Text style={styles.balanceText}>
+                  {t.fromName} deve {formatAmount(t.amount, currency)} a {t.toName}
+                </Text>
+                <TouchableOpacity
+                  style={styles.settleButton}
+                  onPress={() => handleSettle(t.fromUserId, t.toUserId, t.amount)}
+                  disabled={settling === key}
+                >
+                  <Text style={styles.settleButtonText}>{settling === key ? 'Salvo...' : 'Segna come saldato'}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -403,8 +441,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
   balanceText: { ...typography.body, color: colors.text },
+  settleButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.success,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  settleButtonText: { ...typography.caption, color: colors.success, fontWeight: '600' },
   expenseCard: {
     flexDirection: 'row',
     alignItems: 'center',

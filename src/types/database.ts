@@ -81,6 +81,16 @@ export interface ExpenseSplit {
   settled: boolean;
 }
 
+export interface Settlement {
+  id: string;
+  trip_id: string;
+  from_user: string;
+  to_user: string;
+  amount: number;
+  currency: string;
+  created_at: string;
+}
+
 export interface VoteOption {
   id: string;
   name: string;

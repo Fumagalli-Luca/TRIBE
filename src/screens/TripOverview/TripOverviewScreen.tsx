@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Settings } from 'lucide-react-native';
@@ -52,6 +53,16 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
   async function refreshTripInfo() {
     const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
     if (data) setTrip(data as Trip);
+
+    const { data: expenseRows } = await supabase.from('expenses').select('amount').eq('trip_id', tripId);
+    setTotalSpent(((expenseRows as { amount: number }[]) ?? []).reduce((sum, e) => sum + Number(e.amount), 0));
+
+    const { count } = await supabase
+      .from('votes')
+      .select('id', { count: 'exact', head: true })
+      .eq('trip_id', tripId)
+      .eq('status', 'open');
+    setOpenVotesCount(count ?? 0);
   }
 
   async function loadTrip() {
@@ -71,15 +82,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       .map((r) => r.user!);
     setMembers(memberList);
 
-    const { data: expenseRows } = await supabase.from('expenses').select('amount').eq('trip_id', tripId);
-    setTotalSpent(((expenseRows as { amount: number }[]) ?? []).reduce((sum, e) => sum + Number(e.amount), 0));
-
-    const { count } = await supabase
-      .from('votes')
-      .select('id', { count: 'exact', head: true })
-      .eq('trip_id', tripId)
-      .eq('status', 'open');
-    setOpenVotesCount(count ?? 0);
+    await refreshTripInfo();
 
     const {
       data: { user },
@@ -116,10 +119,27 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
     );
   }
 
-  const daysRemaining = Math.max(
-    0,
-    Math.ceil((new Date(trip.start_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  );
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDate = new Date(trip.start_date);
+  const endDate = new Date(trip.end_date);
+  const msPerDay = 1000 * 60 * 60 * 24;
+
+  let dayStatValue: number;
+  let dayStatLabel: string;
+  if (endDate < today) {
+    dayStatValue = 0;
+    dayStatLabel = 'concluso';
+  } else if (startDate <= today) {
+    const dayNumber = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / msPerDay) + 1;
+    dayStatValue = dayNumber;
+    dayStatLabel = `giorno ${dayNumber}/${totalDays}`;
+  } else {
+    dayStatValue = Math.ceil((startDate.getTime() - today.getTime()) / msPerDay);
+    dayStatLabel = 'giorni';
+  }
+
   const budgetTotal = trip.budget_per_person ? trip.budget_per_person * members.length : null;
   const currencySymbol = trip.currency === 'EUR' ? '€' : trip.currency;
 
@@ -151,28 +171,30 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       </View>
 
       {members.length > 0 && (
-        <View style={styles.avatarRow}>
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.avatarRow}>
           <AvatarStack members={members} size={28} max={5} />
-        </View>
+        </Animated.View>
       )}
 
       <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>{daysRemaining}</Text>
-          <Text style={styles.statLabel}>giorni</Text>
-        </View>
-        <View style={styles.statBox}>
+        <Animated.View entering={FadeInUp.duration(320).delay(40)} style={styles.statBox}>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayStatValue}</Text>
+          <Text style={styles.statLabel}>{dayStatLabel}</Text>
+        </Animated.View>
+        <Animated.View entering={FadeInUp.duration(320).delay(90)} style={styles.statBox}>
           <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
             {totalSpent.toFixed(0)}
             {currencySymbol}
             {budgetTotal ? ` / ${budgetTotal.toFixed(0)}${currencySymbol}` : ''}
           </Text>
           <Text style={styles.statLabel}>speso</Text>
-        </View>
-        <TouchableOpacity style={styles.statBox} onPress={() => navigation.navigate('Voting', { tripId })}>
-          <Text style={[styles.statValue, openVotesCount > 0 && styles.statValueAlert]}>{openVotesCount}</Text>
-          <Text style={styles.statLabel}>decisioni</Text>
-        </TouchableOpacity>
+        </Animated.View>
+        <Animated.View entering={FadeInUp.duration(320).delay(140)} style={styles.statBox}>
+          <TouchableOpacity style={styles.statBoxTouchable} onPress={() => navigation.navigate('Voting', { tripId })}>
+            <Text style={[styles.statValue, openVotesCount > 0 && styles.statValueAlert]}>{openVotesCount}</Text>
+            <Text style={styles.statLabel}>decisioni</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
 
       <View style={styles.tabBar}>
@@ -240,6 +262,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     alignItems: 'center',
   },
+  statBoxTouchable: { width: '100%', alignItems: 'center' },
   statValue: { ...typography.monoLg, color: colors.text, fontSize: 18 },
   statValueAlert: { color: colors.danger },
   statLabel: { ...typography.caption, color: colors.textMuted },
