@@ -14,10 +14,11 @@ import BudgetTab from './tabs/BudgetTab';
 import GroupTab from './tabs/GroupTab';
 import ChatTab from './tabs/ChatTab';
 import ChecklistTab from './tabs/ChecklistTab';
+import AssistantTab from './tabs/AssistantTab';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TripOverview'>;
 
-type TabKey = 'itinerario' | 'budget' | 'gruppo' | 'chat' | 'checklist';
+type TabKey = 'itinerario' | 'budget' | 'gruppo' | 'chat' | 'checklist' | 'assistente';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'itinerario', label: 'Itinerario' },
@@ -25,6 +26,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'gruppo', label: 'Gruppo' },
   { key: 'chat', label: 'Chat' },
   { key: 'checklist', label: 'Checklist' },
+  { key: 'assistente', label: 'AI' },
 ];
 
 interface Member {
@@ -206,7 +208,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
         </Animated.View>
       </View>
 
-      <View style={styles.tabBar}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
         {TABS.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -219,10 +221,12 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
             {activeTab === tab.key && <View style={styles.tabIndicator} />}
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {activeTab === 'chat' ? (
         <ChatTab tripId={tripId} navigation={navigation} />
+      ) : activeTab === 'assistente' ? (
+        <AssistantTab tripId={tripId} />
       ) : activeTab === 'itinerario' ? (
         // Gestisce da sé lo scroll (DraggableFlatList per il drag-to-reorder):
         // non va annidato in un altro ScrollView.
@@ -276,18 +280,19 @@ const styles = StyleSheet.create({
   statValueAlert: { color: colors.danger },
   statLabel: { ...typography.caption, color: colors.textMuted },
   tabBar: {
-    flexDirection: 'row',
+    flexGrow: 0,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
   },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, gap: spacing.xs },
+  tabBarContent: { paddingHorizontal: spacing.md, gap: spacing.md },
+  tabItem: { alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, gap: spacing.xs },
   tabLabel: { ...typography.caption, color: colors.textMuted, fontWeight: '600' },
   tabLabelActive: { color: colors.accent },
   tabIndicator: {
     height: 2,
     width: '100%',
+    minWidth: 24,
     backgroundColor: colors.accent,
     borderRadius: 1,
   },

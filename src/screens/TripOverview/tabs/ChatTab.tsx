@@ -20,6 +20,7 @@ import type { RootStackParamList } from '../../../navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
 import { notifyTrip } from '../../../lib/sendPush';
+import { askTripAssistant } from '../../../lib/tripAssistant';
 import { hapticSelect } from '../../../lib/haptics';
 import type { ChatMessage } from '../../../types/database';
 
@@ -51,6 +52,7 @@ export default function ChatTab({ tripId, navigation }: Props) {
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
+  const [aiThinking, setAiThinking] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -123,6 +125,37 @@ export default function ChatTab({ tripId, navigation }: Props) {
     if (data) setMessages((prev) => [...prev, data as ChatMessage]);
     setSending(false);
     notifyTrip(tripId, 'Nuovo messaggio', content);
+
+    if (/@tribe/i.test(content)) {
+      await handleAskAi(content.replace(/@tribe/i, '').trim() || content);
+    }
+  }
+
+  async function handleAskAi(question: string) {
+    setAiThinking(true);
+    try {
+      const answer = await askTripAssistant(tripId, question);
+      const { data } = await supabase
+        .from('chat_messages')
+        .insert({ trip_id: tripId, sender_id: null, type: 'ai', content: answer })
+        .select()
+        .single();
+      if (data) setMessages((prev) => [...prev, data as ChatMessage]);
+    } catch {
+      const { data } = await supabase
+        .from('chat_messages')
+        .insert({
+          trip_id: tripId,
+          sender_id: null,
+          type: 'ai',
+          content: 'Non sono riuscito a rispondere ora, riprova tra un momento.',
+        })
+        .select()
+        .single();
+      if (data) setMessages((prev) => [...prev, data as ChatMessage]);
+    } finally {
+      setAiThinking(false);
+    }
   }
 
   async function handlePickImage() {
@@ -225,6 +258,18 @@ export default function ChatTab({ tripId, navigation }: Props) {
             );
           }
 
+          if (item.type === 'ai') {
+            return (
+              <Animated.View entering={FadeInUp.duration(220)} style={[styles.messageWrap, styles.messageWrapOther]}>
+                <Text style={styles.senderName}>✨ TRIBE AI</Text>
+                <View style={[styles.messageBubble, styles.aiBubble]}>
+                  <Text style={styles.messageText}>{item.content}</Text>
+                  <Text style={styles.messageTime}>{formatTime(item.created_at)}</Text>
+                </View>
+              </Animated.View>
+            );
+          }
+
           const reactions = getReactions(item);
           const activeReactions = Object.entries(reactions).filter(([, ids]) => ids.length > 0);
           const isMine = item.sender_id === userId;
@@ -279,6 +324,15 @@ export default function ChatTab({ tripId, navigation }: Props) {
         }}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessun messaggio ancora.</Text>}
       />
+
+      {aiThinking && (
+        <Animated.View entering={FadeInUp.duration(200)} style={styles.aiThinkingRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.aiThinkingText}>TRIBE AI sta scrivendo...</Text>
+        </Animated.View>
+      )}
+
+      <Text style={styles.aiHint}>Suggerimento: scrivi @tribe seguito da una domanda per chiedere all'AI del viaggio</Text>
 
       <View style={styles.inputRow}>
         <TouchableOpacity style={styles.attachButton} onPress={handlePickImage} disabled={uploadingImage}>
@@ -355,6 +409,22 @@ const styles = StyleSheet.create({
   },
   messageBubbleMine: { backgroundColor: colors.primary },
   messageBubbleOther: { backgroundColor: colors.surface },
+  aiBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
+  aiThinkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  aiThinkingText: { ...typography.caption, color: colors.textMuted },
+  aiHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    opacity: 0.6,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 4,
+  },
   messageImage: { width: 200, height: 200, borderRadius: radius.buttonPrimary },
   messageText: { ...typography.body, color: colors.text },
   messageTime: { ...typography.caption, color: colors.textMuted, marginTop: 2, alignSelf: 'flex-end' },

@@ -13,7 +13,8 @@ export type ExpenseCategory = 'food' | 'transport' | 'accommodation' | 'activity
 export type SplitType = 'equal' | 'custom' | 'percentage';
 export type VoteStatus = 'open' | 'closed';
 export type VoteChoice = 'yes' | 'no';
-export type ChatMessageType = 'text' | 'system' | 'image' | 'location';
+export type ChatMessageType = 'text' | 'system' | 'image' | 'location' | 'ai';
+export type AiConversationRole = 'user' | 'assistant';
 export type ChecklistScope = 'shared' | 'personal';
 export type ChecklistCategory = 'documents' | 'packing' | 'bookings' | 'other';
 export type ItineraryTimeSlot = 'morning' | 'afternoon' | 'evening';
@@ -79,6 +80,15 @@ export interface ExpenseSplit {
   user_id: string;
   amount_owed: number;
   settled: boolean;
+}
+
+export interface AiConversationMessage {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  role: AiConversationRole;
+  content: string;
+  created_at: string;
 }
 
 export interface Settlement {
