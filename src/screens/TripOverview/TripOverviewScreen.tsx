@@ -167,7 +167,7 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {activeTab === 'budget' && <BudgetTab tripId={tripId} />}
-          {activeTab === 'gruppo' && <GroupTab tripId={tripId} />}
+          {activeTab === 'gruppo' && <GroupTab tripId={tripId} navigation={navigation} />}
           {activeTab === 'checklist' && <ChecklistTab tripId={tripId} />}
         </ScrollView>
       )}

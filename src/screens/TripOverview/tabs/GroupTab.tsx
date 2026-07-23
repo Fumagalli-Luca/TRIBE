@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { UserMinus, LogOut } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../../../constants/theme';
 import { supabase } from '../../../lib/supabase';
+import { hapticSelect } from '../../../lib/haptics';
 import Avatar from '../../../components/Avatar';
 import GradientButton from '../../../components/GradientButton';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation/RootNavigator';
 
 interface Props {
   tripId: string;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'TripOverview'>;
 }
 
 interface Member {
@@ -27,12 +32,13 @@ function formatAmount(n: number, currency: string): string {
   return `${sign}${Math.abs(n).toFixed(2)}${symbol}`;
 }
 
-export default function GroupTab({ tripId }: Props) {
+export default function GroupTab({ tripId, navigation }: Props) {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [balances, setBalances] = useState<Map<string, number>>(new Map());
   const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -40,6 +46,11 @@ export default function GroupTab({ tripId }: Props) {
 
   async function load() {
     setLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setUserId(user?.id ?? null);
 
     const { data: trip } = await supabase
       .from('trips')
@@ -88,6 +99,41 @@ export default function GroupTab({ tripId }: Props) {
     });
   }
 
+  function handleRemoveMember(member: Member) {
+    Alert.alert(
+      'Rimuovi membro',
+      `Rimuovere ${member.user?.full_name ?? 'questo utente'} dal viaggio?`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Rimuovi',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('trip_members').delete().eq('id', member.id);
+            hapticSelect();
+            setMembers((prev) => prev.filter((m) => m.id !== member.id));
+          },
+        },
+      ]
+    );
+  }
+
+  function handleLeaveTrip() {
+    const me = members.find((m) => m.user_id === userId);
+    if (!me) return;
+    Alert.alert('Lascia il viaggio', 'Sei sicuro di voler uscire da questo viaggio?', [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Esci',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.from('trip_members').delete().eq('id', me.id);
+          navigation.replace('Home');
+        },
+      },
+    ]);
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -95,6 +141,8 @@ export default function GroupTab({ tripId }: Props) {
       </View>
     );
   }
+
+  const isAdmin = members.some((m) => m.user_id === userId && m.role === 'admin');
 
   return (
     <View style={styles.container}>
@@ -113,6 +161,7 @@ export default function GroupTab({ tripId }: Props) {
 
       {members.map((member) => {
         const net = balances.get(member.user_id) ?? 0;
+        const isMe = member.user_id === userId;
         return (
           <View key={member.id} style={styles.memberRow}>
             <Avatar name={member.user?.full_name ?? null} uri={member.user?.avatar_url} size={44} />
@@ -128,9 +177,23 @@ export default function GroupTab({ tripId }: Props) {
                 {formatAmount(net, currency)}
               </Text>
             )}
+            {isAdmin && !isMe && (
+              <TouchableOpacity
+                onPress={() => handleRemoveMember(member)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.memberAction}
+              >
+                <UserMinus size={18} color={colors.danger} />
+              </TouchableOpacity>
+            )}
           </View>
         );
       })}
+
+      <TouchableOpacity style={styles.leaveRow} onPress={handleLeaveTrip}>
+        <LogOut size={18} color={colors.danger} />
+        <Text style={styles.leaveText}>Lascia il viaggio</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -164,4 +227,13 @@ const styles = StyleSheet.create({
   balance: { ...typography.monoSm },
   balancePositive: { color: colors.success },
   balanceNegative: { color: colors.danger },
+  memberAction: { padding: spacing.xs },
+  leaveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  leaveText: { ...typography.body, color: colors.danger, fontWeight: '600' },
 });
