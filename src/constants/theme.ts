@@ -10,6 +10,7 @@ export const colors = {
   primary: '#7C3AED',
   accent: '#38BDF8',
   success: '#22C55E',
+  warning: '#F59E0B',
   danger: '#EF4444',
   text: '#FFFFFF',
   textMuted: '#A1A1AA',

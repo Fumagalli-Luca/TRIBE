@@ -142,6 +142,9 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
 
   const budgetTotal = trip.budget_per_person ? trip.budget_per_person * members.length : null;
   const currencySymbol = trip.currency === 'EUR' ? '€' : trip.currency;
+  const budgetRatio = budgetTotal ? totalSpent / budgetTotal : null;
+  const budgetStatusColor =
+    budgetRatio === null ? colors.text : budgetRatio > 1 ? colors.danger : budgetRatio >= 0.8 ? colors.warning : colors.success;
 
   return (
     <View style={styles.flex}>
@@ -182,12 +185,18 @@ export default function TripOverviewScreen({ route, navigation }: Props) {
           <Text style={styles.statLabel}>{dayStatLabel}</Text>
         </Animated.View>
         <Animated.View entering={FadeInUp.duration(320).delay(90)} style={styles.statBox}>
-          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-            {totalSpent.toFixed(0)}
-            {currencySymbol}
-            {budgetTotal ? ` / ${budgetTotal.toFixed(0)}${currencySymbol}` : ''}
-          </Text>
-          <Text style={styles.statLabel}>speso</Text>
+          <TouchableOpacity style={styles.statBoxTouchable} onPress={() => setActiveTab('budget')}>
+            <Text
+              style={[styles.statValue, { color: budgetStatusColor }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {totalSpent.toFixed(0)}
+              {currencySymbol}
+              {budgetTotal ? ` / ${budgetTotal.toFixed(0)}${currencySymbol}` : ''}
+            </Text>
+            <Text style={styles.statLabel}>speso</Text>
+          </TouchableOpacity>
         </Animated.View>
         <Animated.View entering={FadeInUp.duration(320).delay(140)} style={styles.statBox}>
           <TouchableOpacity style={styles.statBoxTouchable} onPress={() => navigation.navigate('Voting', { tripId })}>

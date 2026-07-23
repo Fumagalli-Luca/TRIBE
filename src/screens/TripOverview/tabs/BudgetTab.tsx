@@ -162,8 +162,9 @@ export default function BudgetTab({ tripId }: Props) {
     setSettling(null);
   }
 
-  const progressRatio = budgetTotal ? Math.min(1, totalSpent / budgetTotal) : 0;
-  const overBudget = budgetTotal !== null && totalSpent > budgetTotal;
+  const rawRatio = budgetTotal ? totalSpent / budgetTotal : 0;
+  const progressRatio = Math.min(1, rawRatio);
+  const ringColor = budgetTotal === null ? colors.accent : rawRatio > 1 ? colors.danger : rawRatio >= 0.8 ? colors.warning : colors.success;
 
   function toggleParticipant(id: string) {
     setParticipants((prev) => {
@@ -250,7 +251,7 @@ export default function BudgetTab({ tripId }: Props) {
           )}
         </View>
         {budgetTotal !== null && (
-          <ProgressRing progress={progressRatio} color={overBudget ? colors.danger : colors.success}>
+          <ProgressRing progress={progressRatio} color={ringColor}>
             <Text style={styles.ringLabel}>{Math.round(progressRatio * 100)}%</Text>
           </ProgressRing>
         )}
